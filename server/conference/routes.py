@@ -2,6 +2,7 @@
 from flask import Blueprint, request, jsonify
 from flask_login import login_required
 from conference.interface import Conference
+from conference.conf_manager import 
 
 from user import User
 

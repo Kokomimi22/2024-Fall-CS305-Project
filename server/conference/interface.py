@@ -1,12 +1,12 @@
 
 class Conference:
-    def __init__(self, server, uuid, conference_name):
+    def __init__(self, supervisor, uuid, conference_name):
         '''
-        :param server: socket
+        :param supervisor: User
         :param uuid: str
         :param conference_name: str
         '''
-        self.server = server
+        self.supervisor = supervisor
         self.connected_clients = {} # http connection
         self.clients_num = 0
         self.connected_streams = {} # udp connection
