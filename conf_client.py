@@ -88,8 +88,10 @@ class ConferenceClient:
         """
         switch for sharing certain type of data (screen, camera, audio, etc.)
         """
+        if data_type not in self.support_data_types:
+            print(f'[Error]: Unsupported data type {data_type}')
+            return
         self.conns.sendall(f'share {data_type}'.encode('utf-8'))
-
         cmd_input = input(f'Please transfer the data: ').strip().lower()
         while True:
             self.conns.sendall(cmd_input.encode('utf-8'))
@@ -123,7 +125,6 @@ class ConferenceClient:
         """
         running task: output received stream data
         """
-        # write is into a file
         print(f'[Info]: Received data: {self.recv_data}')
 
     def start_conference(self):
