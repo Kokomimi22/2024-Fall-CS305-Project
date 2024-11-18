@@ -1,8 +1,8 @@
-'''
+"""
 Simple util implementation for video conference
 Including data capture, image compression and image overlap
 Note that you can use your own implementation as well :)
-'''
+"""
 from io import BytesIO
 import pyaudio
 import cv2

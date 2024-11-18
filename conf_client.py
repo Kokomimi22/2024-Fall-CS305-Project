@@ -1,80 +1,160 @@
+import socket
+import threading
+from config import *
 from util import *
 
 
 class ConferenceClient:
     def __init__(self,):
         # sync client
+        self.recv_thread = None
         self.is_working = True
         self.server_addr = None  # server addr
         self.on_meeting = False  # status
         self.conns = None  # you may need to maintain multiple conns for a single conference
-        self.support_data_types = []  # for some types of data
+        self.support_data_types = ['screen', 'camera', 'audio']  # the data types that can be shared, which should be modified
         self.share_data = {}
 
         self.conference_info = None  # you may need to save and update some conference_info regularly
-
+        self.conference_id = None  # conference_id for distinguish difference conference
         self.recv_data = None  # you may need to save received streamd data from other clients in conference
 
     def create_conference(self):
         """
         create a conference: send create-conference request to server and obtain necessary data to
         """
-        pass
+        if self.on_meeting:
+            print(f'[Error]: You are already in a conference {self.conference_id}')
+            return
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((SERVER_IP, MAIN_SERVER_PORT))
+            s.sendall(b'create')
+            self.recv_data = s.recv(1024).decode('utf-8')
+            if self.recv_data.startswith('Created'):
+                conference_id = self.recv_data.split(' ')[1]
+                print(f'[Info]: Created conference {conference_id}')
+                self.join_conference(conference_id=conference_id)
+            else:
+                print(f'[Error]: Failed to create conference')
 
     def join_conference(self, conference_id):
         """
         join a conference: send join-conference request with given conference_id, and obtain necessary data to
         """
-        pass
-
+        if self.on_meeting:
+            print(f'[Error]: You are already in a conference {self.conference_id}')
+            return
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((SERVER_IP, MAIN_SERVER_PORT))
+            s.sendall(f'join {conference_id}'.encode())
+            self.recv_data = s.recv(100).decode('utf-8')
+            if self.recv_data.startswith('Joined'):
+                print(f'[Info]: Joined conference {conference_id}')
+                self.conference_id = conference_id
+                conference_ports = self.recv_data.split(' ')[-1]
+                self.server_addr = (SERVER_IP, int(conference_ports))
+                self.on_meeting = True
+                # start necessary running task for conference
+                self.start_conference()
+            else:
+                print(f'[Error]: Failed to join conference {conference_id}')
     def quit_conference(self):
         """
         quit your on-going conference
         """
-        pass
+        self.conns.sendall(b'quit')
 
     def cancel_conference(self):
         """
         cancel your on-going conference (when you are the conference manager): ask server to close all clients
         """
-        pass
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((SERVER_IP, MAIN_SERVER_PORT))
+            s.sendall(f'cancel {self.conference_id}'.encode())
+            self.recv_data = s.recv(100).decode('utf-8')
+            if self.recv_data.startswith('Cancelled'):
+                print(f'[Info]: Cancelled conference {self.conference_id}')
+            else:
+                print(f'[Error]: Failed to cancel conference {self.conference_id}')
 
-    def keep_share(self, data_type, send_conn, capture_function, compress=None, fps_or_frequency=30):
-        '''
-        running task: keep sharing (capture and send) certain type of data from server or clients (P2P)
-        you can create different functions for sharing various kinds of data
-        '''
-        pass
+    # async def keep_share(self, data_type, send_conn, capture_function, compress=None, fps_or_frequency=30):
+    #     """
+    #     running task: keep sharing (capture and send) certain type of data from server or clients (P2P)
+    #     you can create different functions for sharing various kinds of data
+    #     """
+    #     pass
 
     def share_switch(self, data_type):
-        '''
+        """
         switch for sharing certain type of data (screen, camera, audio, etc.)
-        '''
-        pass
+        """
+        self.conns.sendall(f'share {data_type}'.encode('utf-8'))
 
-    def keep_recv(self, recv_conn, data_type, decompress=None):
-        '''
+        cmd_input = input(f'Please transfer the data: ').strip().lower()
+        while True:
+            self.conns.sendall(cmd_input.encode('utf-8'))
+            cmd_input = input(f'Is that over? ').strip().lower()
+            if cmd_input == 'yes':
+                self.conns.sendall(b'end')
+                break
+
+
+
+    def keep_recv(self, recv_conn=None, data_type=None, decompress=None):
+        """
         running task: keep receiving certain type of data (save or output)
         you can create other functions for receiving various kinds of data
-        '''
+        """
+
+        def recv_task():
+            while self.on_meeting:
+                self.recv_data = recv_conn.recv(1024).decode('utf-8')
+                if self.recv_data == 'Quitted' or self.recv_data == 'Cancelled':
+                    print(f'The conference {self.conference_id} has been ended.')
+                    self.close_conference()
+                    break
+                if self.recv_data:
+                    self.output_data()
+
+        self.recv_thread = threading.Thread(target=recv_task)
+        self.recv_thread.start()
 
     def output_data(self):
-        '''
+        """
         running task: output received stream data
-        '''
+        """
+        # write is into a file
+        print(f'[Info]: Received data: {self.recv_data}')
 
     def start_conference(self):
-        '''
+        """
         init conns when create or join a conference with necessary conference_info
         and
         start necessary running task for conference
-        '''
+        """
+        self.conns = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.conns.connect(self.server_addr)
+        self.keep_recv(recv_conn=self.conns, data_type='screen', decompress=None)
+
 
     def close_conference(self):
-        '''
+        """
         close all conns to servers or other clients and cancel the running tasks
         pay attention to the exception handling
-        '''
+        """
+        self.on_meeting = False
+        if self.conns:
+            try:
+                self.conns.shutdown(socket.SHUT_RDWR)
+            except socket.error as e:
+                print(f"[Error]: Error shutting down connection: {e}")
+            finally:
+                try:
+                    self.conns.close()
+                    print("[Info]: Connection closed successfully.")
+                except socket.error as e:
+                    print(f"[Error]: Error closing connection: {e}")
+            self.conns = None
 
     def start(self):
         """
@@ -98,6 +178,10 @@ class ConferenceClient:
                     self.quit_conference()
                 elif cmd_input == 'cancel':
                     self.cancel_conference()
+                elif cmd_input == 'exit':
+                    if self.on_meeting:
+                        self.quit_conference()
+                    break
                 else:
                     recognized = False
             elif len(fields) == 2:
@@ -111,6 +195,8 @@ class ConferenceClient:
                     data_type = fields[1]
                     if data_type in self.share_data.keys():
                         self.share_switch(data_type)
+                elif fields[0] == 'share':
+                    self.share_switch(fields[1])
                 else:
                     recognized = False
             else:
