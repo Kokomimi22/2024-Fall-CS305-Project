@@ -11,7 +11,7 @@ import asyncio
 class ConferenceServer:
     def __init__(self, manager, conference_id, conf_serve_ports):
         #the ip address of the manager
-        self.manager = str(manager).split(',')[0]
+        self.manager = manager
         self.conference_id = conference_id
         self.conf_serve_ports = conf_serve_ports
         self.data_serve_ports = {}
@@ -64,6 +64,9 @@ class ConferenceServer:
         finally:
             del self.client_conns[addr]
             self.clients_info.remove(addr)
+            if not self.client_conns:
+                self.running = False
+                await self.cancel_conference()
             writer.close()
             await writer.wait_closed()
 
@@ -93,6 +96,7 @@ class ConferenceServer:
         self.client_conns.clear()
         self.clients_info.clear()
         print(f"Conference {self.conference_id} successfully cancelled.")
+        del self
         #self.loop.stop()
 
     def start(self):
@@ -171,7 +175,7 @@ class MainServer:
         """
         if conference_id in self.conference_servers:
             manager_addr = self.conference_servers[conference_id].manager
-            client_addr = str(addr).split(',')[0]
+            client_addr = addr
             if manager_addr != client_addr:
                 return "Permission denied"
             conference_server = self.conference_servers[conference_id]
@@ -182,7 +186,7 @@ class MainServer:
             response = f"Conference {conference_id} not found"
         return response
     async def request_handler(self, reader, writer):
-        data = await reader.read(100)
+        data = await reader.read(CONTROL_LINE_BUFFER)
         message = data.decode()
         addr = writer.get_extra_info('peername')
 

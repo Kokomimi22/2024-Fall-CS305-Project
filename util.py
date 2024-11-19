@@ -10,6 +10,7 @@ import pyautogui
 import numpy as np
 from PIL import Image, ImageGrab
 from config import *
+import time
 
 
 # audio setting
