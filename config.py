@@ -10,7 +10,7 @@ TIMEOUT_SERVER = 5
 LOG_INTERVAL = 2
 CONTROL_LINE_BUFFER = 1024
 DATA_LINE_BUFFER = 4096
-
+USER_INFO_FILE = 'user_info.json'
 CHUNK = 1024
 CHANNELS = 1  # Channels for audio capture
 RATE = 44100  # Sampling rate for audio capture

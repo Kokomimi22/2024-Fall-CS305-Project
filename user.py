@@ -1,14 +1,9 @@
 class User:
-    def __init__(self, username, password, uuid):
+    def __init__(self, uuid, username='default', password='password'):
         self.username = username
         self.password = password
         self.uuid = uuid
-        self.addr = None #(ip, port)
-
-    def __init__(self, uuid):
-        self.username = 'default'
-        self.password = 'password'
-        self.uuid = uuid
+        self.addr = None  # (ip, port)
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -25,9 +20,5 @@ class User:
         if password:
             self.password = password
 
-    def assgin_addr(self, addr):
-        self.addr = addr
-
-    def assgin_addr(self, ip, port):
+    def assign_addr(self, ip, port):
         self.addr = (ip, port)
-    

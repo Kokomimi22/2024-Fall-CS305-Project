@@ -1,7 +1,11 @@
 import asyncio
+import json
 import random
 import threading
 from http.client import responses
+
+from pyexpat.errors import messages
+
 from config import *
 from util import *
 
@@ -11,7 +15,7 @@ import asyncio
 class ConferenceServer:
     def __init__(self, manager, conference_id, conf_serve_ports):
         #the ip address of the manager
-        self.manager = manager
+        self.manager = manager #str(uuid)
         self.conference_id = conference_id
         self.conf_serve_ports = conf_serve_ports
         self.data_serve_ports = {}
@@ -42,17 +46,23 @@ class ConferenceServer:
         addr = writer.get_extra_info('peername')
         self.clients_info.append(addr)
         self.client_conns[addr] = (reader, writer)
+        user_uuid = None
         try:
             while self.running:
-                data = await reader.read(100)
+                data = await reader.read(CONTROL_LINE_BUFFER)
                 if not data:
                     break
-                print(f"Received: {data.decode()} from {addr}")
                 message = data.decode()
-                if message.startswith('share'):
-                    data_type = message.split()[1]
+                print(f"Received: {message} from {addr}")
+                fields = data.decode().split(' ')
+                if fields[0] == 'share':
+                    data_type = fields[1]
                     await self.handle_data(reader, writer, data_type)
-                elif message.startswith('quit'):
+                elif fields[0] == 'init':
+                    user_uuid = fields[1]
+                    writer.write(f"Welcome to conference {self.conference_id}".encode())
+                    await writer.drain()
+                elif fields[0] == 'quit':
                     print(f"Client {addr} has requested to quit the conference.")
                     writer.write(b'Quitted')
                     break
@@ -70,6 +80,9 @@ class ConferenceServer:
                 writer.close()
                 await writer.wait_closed()
                 print(f"Client {addr} has left the conference.")
+            # judge if the manager has left the conference
+            if user_uuid == self.manager and self.running:
+                await self.cancel_conference()
 
     async def log(self):
         try:
@@ -127,7 +140,7 @@ class MainServer:
         self.conference_conns = {}  # self.conference_conns[conference_id] = (reader, writer)
         self.conference_servers = {}  # self.conference_servers[conference_id] = ConferenceManager
 
-    def handle_creat_conference(self, addr):
+    def handle_create_conference(self, uuid):
         """
         create conference: create and start the corresponding ConferenceServer, and reply necessary info to client
         """
@@ -143,7 +156,7 @@ class MainServer:
             conference_port = random.randint(10000, 65535)
 
         # Create and store the new ConferenceServer
-        conference_server = ConferenceServer(addr, conference_id, conference_port)
+        conference_server = ConferenceServer(uuid, conference_id, conference_port)
         self.conference_servers[conference_id] = conference_server
         # Start the conference server in a new thread
         conference_thread = threading.Thread(target=conference_server.start)
@@ -164,16 +177,43 @@ class MainServer:
         quit conference (in-meeting request & or no need to request)
         """
         pass
-
-    async def handle_cancel_conference(self, conference_id, addr=None):
+    def handle_register(self, username, password):
+        """
+        register a new user
+        """
+        # 生成一个唯一的uuid，储存到json文件中
+        # TODO: 或许回来可以做一些数据库，使用jwt来进行用户认证等等，目前只是简单的存储到json文件中
+        with open(USER_INFO_FILE, 'r') as f:
+            try:
+                users = json.load(f)
+            except json.decoder.JSONDecodeError:
+                users = {}
+            uuid = random.randint(1000, 9999)
+            while uuid in users.keys():
+                uuid = random.randint(1000, 9999)
+            users[uuid] = {'username': username, 'password': password}
+        with open(USER_INFO_FILE, 'w') as f:
+            json.dump(users, f)
+        return f"Registered {username} with uuid {uuid}"
+    def handle_login(self, username, password):
+        """
+        login an existing user
+        """
+        # 读取json文件，查找是否有对应的用户名和密码
+        with open(USER_INFO_FILE, 'r') as f:
+            users = json.load(f)
+            for uuid, user_info in users.items():
+                if user_info['username'] == username and user_info['password'] == password:
+                    return f"Logged in {username} with uuid {uuid}"
+        return "Login failed"
+    def handle_cancel_conference(self, conference_id, uuid=None):
         """
         cancel conference (in-meeting request, a ConferenceServer should be closed by the MainServer)
         """
         if conference_id in self.conference_servers:
-            manager_addr = self.conference_servers[conference_id].manager
-            client_addr = addr
-            #if manager_addr != client_addr:
-            #    return "Permission denied"
+            manager_uuid = self.conference_servers[conference_id].manager
+            if uuid != manager_uuid:
+                return "You are not the manager of this conference"
             conference_server = self.conference_servers[conference_id]
             asyncio.run_coroutine_threadsafe(conference_server.stop(), conference_server.loop)
             del self.conference_servers[conference_id]
@@ -183,19 +223,32 @@ class MainServer:
         return response
     async def request_handler(self, reader, writer):
         data = await reader.read(CONTROL_LINE_BUFFER)
-        message = data.decode()
+        message = data.decode().strip()
         addr = writer.get_extra_info('peername')
 
         print(f"Received: {message} from {addr}")
+        fields = message.split(' ')
 
-        if message.startswith('create'):
-           response = self.handle_creat_conference(addr=addr)
 
-        elif message.startswith('join'):
-            response = self.handle_join_conference(conference_id=int(message.split(' ')[1]))
-
-        elif message.startswith('cancel'):
-            response = await self.handle_cancel_conference(conference_id=int(message.split(' ')[1]), addr=addr)
+        if len(fields) == 2:
+            if fields[0] == 'join':
+                response = self.handle_join_conference(conference_id=int(fields[1]))
+            else:
+                response = "Unknown command"
+        elif len(fields) == 3:
+            if fields[0] == 'register':
+                response = self.handle_register(fields[1], fields[2])
+            elif fields[0] == 'login':
+                response = self.handle_login(fields[1], fields[2])
+            elif fields[0] == 'create':
+               response = self.handle_create_conference(uuid=fields[-1])
+            else:
+                response = "Unknown command"
+        elif len(fields) == 4:
+            if fields[0] == 'cancel':
+                response = self.handle_cancel_conference(conference_id=int(fields[1]), uuid=fields[-1])
+            else:
+                response = "Unknown command"
         else:
             response = "Unknown command"
 
