@@ -27,7 +27,7 @@ class ConferenceServer:
         Receive sharing stream data from a client and forward it to the rest of the clients.
         """
         while self.running:
-            data = await reader.read(1024)
+            data = await reader.read(DATA_LINE_BUFFER)
             if not data or data == b'end':
                 break
             for client_reader, client_writer in self.client_conns.values():

@@ -86,18 +86,21 @@ class ConferenceClient:
         while self.on_meeting:
             if data_type == 'screen':
                 screen_shot = capture_function()
-                send_conn.sendall(b'screen')
+                send_conn.send(b'screen')
                 send_conn.sendall(compress(screen_shot) if compress else screen_shot)
+                send_conn.send(b'eof')
                 time.sleep(1 / fps_or_frequency)
             elif data_type == 'camera':
                 camera_frame = capture_function()
-                send_conn.sendall(b'camera')
+                send_conn.send(b'camera')
                 send_conn.sendall(compress(camera_frame) if compress else camera_frame)
+                send_conn.send(b'eof')
                 time.sleep(1 / fps_or_frequency)
             elif data_type == 'audio':
                 audio_data = capture_function()
-                send_conn.sendall(b'audio')
+                send_conn.send(b'audio')
                 send_conn.sendall(audio_data)
+                send_conn.send(b'eof')
                 time.sleep(1 / fps_or_frequency)
         pass
 
@@ -135,12 +138,13 @@ class ConferenceClient:
 
         def recv_task():
             while self.on_meeting:
-                self.recv_data = recv_conn.recv(DATA_LINE_BUFFER)
-                if self.recv_data == b'Quitted' or self.recv_data == b'Cancelled':
+                _recv_data = recv_conn.recv(DATA_LINE_BUFFER)
+                if _recv_data == b'Quitted' or _recv_data == b'Cancelled':
                     print(f'The conference {self.conference_id} has been ended.')
                     self.close_conference()
                     break
-                if self.recv_data:
+                if _recv_data:
+                    self.recv_data = _recv_data # bytes concatenation
                     self.output_data()
 
         self.recv_thread = threading.Thread(target=recv_task)
@@ -152,6 +156,16 @@ class ConferenceClient:
         """
         # write is into a file
         print(f'[Info]: Received data: {self.recv_data}')
+
+    def save_img(self, img_data, img_path):
+        """
+        save image data to a file
+        :param img_data: bytes, image data
+        :param img_path: str, image file path
+        """
+        with open(img_path, 'wb') as f:
+            f.write(img_data)
+
 
     def start_conference(self):
         """
