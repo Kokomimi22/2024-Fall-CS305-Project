@@ -38,11 +38,17 @@ class UserManager:
         self.users[uuid] = user
         return user
 
-    def login(self, uuid, password):
-        user = self.users.get(uuid)
+    def login(self, username, password):
+        user = self.users.get_byname(username)
         if user and user.password == password:
             user.is_active = True
             return user
+        return None
+
+    def get_byname(self, username):
+        for user in self.users.values():
+            if user.username == username:
+                return user
         return None
 
     def logout(self, uuid):
