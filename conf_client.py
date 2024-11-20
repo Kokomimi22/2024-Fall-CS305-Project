@@ -240,6 +240,21 @@ class ConferenceClient:
                 self.userInfo = User(uuid, username, password)
             else:
                 print(f'[Error]: Failed to login')
+
+    def logout(self):
+        """
+        logout the user
+        """
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((SERVER_IP, MAIN_SERVER_PORT))
+            s.sendall(f'logout {self.userInfo.uuid}'.encode())
+            self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
+            if self.recv_data.startswith('Logged'):
+                print(f'[Info]: Logged out successfully')
+                self.userInfo = None
+            else:
+                print(f'[Error]: Failed to logout')
+                
     def command_parser(self, cmd_input):
             """
             parse the command line input and execute the corresponding functions
@@ -260,6 +275,7 @@ class ConferenceClient:
                     self.cancel_conference()
                 elif cmd_input == 'exit':
                     if self.on_meeting:
+                        self.logout()
                         self.quit_conference()
                     return False
                 else:

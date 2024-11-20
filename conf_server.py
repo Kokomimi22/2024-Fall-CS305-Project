@@ -139,6 +139,7 @@ class MainServer:
 
         self.conference_conns = {}  # self.conference_conns[conference_id] = (reader, writer)
         self.conference_servers = {}  # self.conference_servers[conference_id] = ConferenceManager
+        self.user_manager = UserManager()
 
     def handle_create_conference(self, uuid):
         """
@@ -163,6 +164,7 @@ class MainServer:
         conference_thread.start()
         print(f"Created conference {conference_id} with ports {conference_port}")
         return f"Created {conference_id}"
+        
     def handle_join_conference(self, conference_id):
         """
         join conference: search corresponding conference_info and ConferenceServer, and reply necessary info to client
@@ -172,6 +174,7 @@ class MainServer:
         else:
             response = f"Conference {conference_id} not found"
         return response
+
     def handle_quit_conference(self):
         """
         quit conference (in-meeting request & or no need to request)
@@ -183,29 +186,31 @@ class MainServer:
         """
         # 生成一个唯一的uuid，储存到json文件中
         # TODO: 或许回来可以做一些数据库，使用jwt来进行用户认证等等，目前只是简单的存储到json文件中
-        with open(USER_INFO_FILE, 'r') as f:
-            try:
-                users = json.load(f)
-            except json.decoder.JSONDecodeError:
-                users = {}
-            uuid = random.randint(1000, 9999)
-            while uuid in users.keys():
-                uuid = random.randint(1000, 9999)
-            users[uuid] = {'username': username, 'password': password}
-        with open(USER_INFO_FILE, 'w') as f:
-            json.dump(users, f)
-        return f"Registered {username} with uuid {uuid}"
+        _new_user = self.user_manager.register(username, password)
+        if _new_user:
+            uuid = _new_user.uuid
+            return f"Registered {username} with uuid {uuid}"
+        return "Registration failed"
+
     def handle_login(self, username, password):
         """
         login an existing user
         """
         # 读取json文件，查找是否有对应的用户名和密码
-        with open(USER_INFO_FILE, 'r') as f:
-            users = json.load(f)
-            for uuid, user_info in users.items():
-                if user_info['username'] == username and user_info['password'] == password:
-                    return f"Logged in {username} with uuid {uuid}"
+        _user = self.user_manager.login(username, password)
+        if _user:
+            uuid = _user.uuid
+            return f"Logged in {username} with uuid {uuid}"
         return "Login failed"
+
+    def handle_logout(self, uuid):
+        """
+        logout an existing user
+        """
+        # 读取json文件，查找是否有对应的uuid
+        self.user_manager.logout(uuid)
+        return f"Logged out {uuid}"
+
     def handle_cancel_conference(self, conference_id, uuid=None):
         """
         cancel conference (in-meeting request, a ConferenceServer should be closed by the MainServer)
@@ -233,6 +238,8 @@ class MainServer:
         if len(fields) == 2:
             if fields[0] == 'join':
                 response = self.handle_join_conference(conference_id=int(fields[1]))
+            elif fields[0] == 'logout':
+                response = self.handle_logout(uuid=fields[1])
             else:
                 response = "Unknown command"
         elif len(fields) == 3:
@@ -275,6 +282,7 @@ class MainServer:
         """
         print(f"MainServer started at {self.server_ip}:{self.server_port}")
         asyncio.run(self.start_server())
+        self.user_manager.load()
 
 
 if __name__ == '__main__':

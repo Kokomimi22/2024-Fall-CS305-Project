@@ -12,6 +12,7 @@ from PIL import Image, ImageGrab
 from config import *
 import time
 
+import uuid
 
 # audio setting
 FORMAT = pyaudio.paInt16
@@ -147,3 +148,50 @@ def decompress_image(image_bytes):
     image = Image.open(img_byte_arr)
 
     return image
+
+### UUID module ###
+class UUID:
+
+    UUID_SIZE = 16
+
+    def __init__(self):
+        '''
+        default constructor, use uuid4
+        '''
+        self.uuids = [] # list of uuids_hex
+
+    def generate_uuid(self, length=UUID_SIZE):
+        '''
+        generate a uuid in hex
+        :param length: int, length of uuid in hex
+        :return: str, uuid in hex
+        '''
+        if length < 0:
+            raise ValueError('length should be a positive integer')
+        if length > 32:
+            raise ValueError('length should be less than 32')
+    
+        _uuid_hex = uuid.uuid4().hex[:length]
+
+        while _uuid_hex in self.uuids:
+            _uuid_hex = uuid.uuid4().hex[:length]
+        uuids.append(_uuid_hex)
+        return _uuid_hex
+
+    def remove_uuid(self, uuid_hex):
+        '''
+        remove a uuid from the list
+        :param uuid_hex: str, uuid in hex
+        '''
+        if uuid_hex in self.uuids:
+            self.uuids.remove(uuid_hex)
+        else:
+            raise ValueError('uuid not found')
+    
+    def get_uuids(self):
+        '''
+        get all uuids
+        :return: list, list of uuids in hex
+        '''
+        return self.uuids
+
