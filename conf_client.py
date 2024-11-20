@@ -14,6 +14,7 @@ class ConferenceClient:
         self.conns = None  # you may need to maintain multiple conns for a single conference
         self.support_data_types = ['screen', 'camera', 'audio']  # the data types that can be shared, which should be modified
         self.share_data = {}
+        self.sharing_task = None
 
         self.conference_info = None  # you may need to save and update some conference_info regularly
         self.conference_id = None  # conference_id for distinguish difference conference
@@ -29,7 +30,7 @@ class ConferenceClient:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
             s.sendall(b'create')
-            self.recv_data = s.recv(1024).decode('utf-8')
+            self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
             if self.recv_data.startswith('Created'):
                 conference_id = self.recv_data.split(' ')[1]
                 print(f'[Info]: Created conference {conference_id}')
@@ -47,7 +48,7 @@ class ConferenceClient:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
             s.sendall(f'join {conference_id}'.encode())
-            self.recv_data = s.recv(100).decode('utf-8')
+            self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
             if self.recv_data.startswith('Joined'):
                 print(f'[Info]: Joined conference {conference_id}')
                 self.conference_id = conference_id
@@ -71,34 +72,58 @@ class ConferenceClient:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
             s.sendall(f'cancel {self.conference_id}'.encode())
-            self.recv_data = s.recv(100).decode('utf-8')
+            self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
             if self.recv_data.startswith('Cancelled'):
                 print(f'[Info]: Cancelled conference {self.conference_id}')
             else:
                 print(f'[Error]: Failed to cancel conference {self.conference_id}')
 
-    # async def keep_share(self, data_type, send_conn, capture_function, compress=None, fps_or_frequency=30):
-    #     """
-    #     running task: keep sharing (capture and send) certain type of data from server or clients (P2P)
-    #     you can create different functions for sharing various kinds of data
-    #     """
-    #     pass
+    def keep_share(self, data_type, send_conn, capture_function, compress=None, fps_or_frequency=30):
+        """
+        running task: keep sharing (capture and send) certain type of data from server or clients (P2P)
+        you can create different functions for sharing various kinds of data
+        """
+        while self.on_meeting:
+            if data_type == 'screen':
+                screen_shot = capture_function()
+                send_conn.sendall(b'screen')
+                send_conn.sendall(compress(screen_shot) if compress else screen_shot)
+                time.sleep(1 / fps_or_frequency)
+            elif data_type == 'camera':
+                camera_frame = capture_function()
+                send_conn.sendall(b'camera')
+                send_conn.sendall(compress(camera_frame) if compress else camera_frame)
+                time.sleep(1 / fps_or_frequency)
+            elif data_type == 'audio':
+                audio_data = capture_function()
+                send_conn.sendall(b'audio')
+                send_conn.sendall(audio_data)
+                time.sleep(1 / fps_or_frequency)
+        pass
 
     def share_switch(self, data_type):
         """
         switch for sharing certain type of data (screen, camera, audio, etc.)
         """
-        if data_type not in self.support_data_types:
-            print(f'[Error]: Unsupported data type {data_type}')
-            return
         self.conns.sendall(f'share {data_type}'.encode('utf-8'))
-        cmd_input = input(f'Please transfer the data: ').strip().lower()
-        while True:
-            self.conns.sendall(cmd_input.encode('utf-8'))
-            cmd_input = input(f'Is that over? ').strip().lower()
-            if cmd_input == 'yes':
-                self.conns.sendall(b'end')
-                break
+
+        # cmd_input = input(f'Please transfer the data: ').strip().lower()
+        # while True:
+        #     self.conns.sendall(cmd_input.encode('utf-8'))
+        #     cmd_input = input(f'Is that over? ').strip().lower()
+        #     if cmd_input == 'yes':
+        #         self.conns.sendall(b'end')
+        #         break
+
+        # test keep_share
+        if data_type == 'screen':
+            _sharing_task = threading.Thread(target=self.keep_share, args=(data_type, self.conns, capture_screen, compress_image))
+        elif data_type == 'camera':
+            _sharing_task = threading.Thread(target=self.keep_share, args=(data_type, self.conns, capture_camera, compress_image))
+        elif data_type == 'audio':
+            _sharing_task = threading.Thread(target=self.keep_share, args=(data_type, self.conns, capture_voice))
+        self.sharing_task = _sharing_task
+        _sharing_task.start()
 
 
 
@@ -110,8 +135,8 @@ class ConferenceClient:
 
         def recv_task():
             while self.on_meeting:
-                self.recv_data = recv_conn.recv(1024).decode('utf-8')
-                if self.recv_data == 'Quitted' or self.recv_data == 'Cancelled':
+                self.recv_data = recv_conn.recv(DATA_LINE_BUFFER)
+                if self.recv_data == b'Quitted' or self.recv_data == b'Cancelled':
                     print(f'The conference {self.conference_id} has been ended.')
                     self.close_conference()
                     break
@@ -125,6 +150,7 @@ class ConferenceClient:
         """
         running task: output received stream data
         """
+        # write is into a file
         print(f'[Info]: Received data: {self.recv_data}')
 
     def start_conference(self):
@@ -161,7 +187,7 @@ class ConferenceClient:
         """
         execute functions based on the command line input
         """
-        while True:
+        while self.is_working:
             if not self.on_meeting:
                 status = 'Free'
             else:
@@ -169,7 +195,15 @@ class ConferenceClient:
 
             recognized = True
             cmd_input = input(f'({status}) Please enter a operation (enter "?" to help): ').strip().lower()
+            self.is_working = self.command_parser(cmd_input)
+
+    def command_parser(self, cmd_input):
+            """
+            parse the command line input and execute the corresponding functions
+            """
+            cmd_input = cmd_input.strip().lower()
             fields = cmd_input.split(maxsplit=1)
+
             if len(fields) == 1:
                 if cmd_input in ('?', '？'):
                     print(HELP)
@@ -178,33 +212,26 @@ class ConferenceClient:
                 elif cmd_input == 'quit':
                     self.quit_conference()
                 elif cmd_input == 'cancel':
-                    self.cancel_conference()
+                        self.cancel_conference()
                 elif cmd_input == 'exit':
                     if self.on_meeting:
                         self.quit_conference()
-                    break
+                    return False
                 else:
-                    recognized = False
+                    print('[Error]: Invalid command' + '\r\n' + HELP)
             elif len(fields) == 2:
-                if fields[0] == 'join':
-                    input_conf_id = fields[1]
-                    if input_conf_id.isdigit():
-                        self.join_conference(input_conf_id)
-                    else:
-                        print('[Warn]: Input conference ID must be in digital form')
-                elif fields[0] == 'switch':
-                    data_type = fields[1]
-                    if data_type in self.share_data.keys():
-                        self.share_switch(data_type)
+                arg = fields[1]
+                if fields[0] == 'join' and arg.isdigit():
+                    self.join_conference(arg)
+                elif fields[0] == 'switch' and arg in self.support_data_types:
+                    self.share_switch(arg)
                 elif fields[0] == 'share':
-                    self.share_switch(fields[1])
+                    self.share_switch(arg)
                 else:
-                    recognized = False
+                    print('[Error]: Invalid command' + '\r\n' + HELP)
             else:
-                recognized = False
-
-            if not recognized:
-                print(f'[Warn]: Unrecognized cmd_input {cmd_input}')
+                print('[Error]: Invalid command' + '\r\n' + HELP)
+            return True    
 
 
 if __name__ == '__main__':

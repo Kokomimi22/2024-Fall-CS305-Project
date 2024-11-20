@@ -11,7 +11,7 @@ import asyncio
 class ConferenceServer:
     def __init__(self, manager, conference_id, conf_serve_ports):
         #the ip address of the manager
-        self.manager = str(manager).split(',')[0]
+        self.manager = manager
         self.conference_id = conference_id
         self.conf_serve_ports = conf_serve_ports
         self.data_serve_ports = {}
@@ -51,7 +51,8 @@ class ConferenceServer:
                 message = data.decode()
                 if message.startswith('share'):
                     data_type = message.split()[1]
-                    await self.handle_data(reader, writer, data_type)
+                    if data_type in self.data_types:
+                        await self.handle_data(reader, writer, data_type)
                 elif message.startswith('quit'):
                     print(f"Client {addr} has requested to quit the conference.")
                     writer.write(b'Quitted')
@@ -63,12 +64,11 @@ class ConferenceServer:
         finally:
             del self.client_conns[addr]
             self.clients_info.remove(addr)
-            # judge if the writer is closed
-            if not writer.is_closing():
-                writer.write(b'Cancelled')
-                writer.close()
-                await writer.wait_closed()
-                print(f"Client {addr} has left the conference.")
+            if not self.client_conns:
+                self.running = False
+                await self.cancel_conference()
+            writer.close()
+            await writer.wait_closed()
 
     async def log(self):
         while self.running:
@@ -85,10 +85,18 @@ class ConferenceServer:
         Disconnect all connections to cancel the conference.
         """
         print(f"Attempting to cancel conference {self.conference_id}...")
-        tasks = asyncio.all_tasks(self.loop)
-        for task in tasks:
-            task.cancel()
+        # copy the client_conns to avoid RuntimeError: dictionary changed size during iteration
+        client_conns = self.client_conns.copy()
+        for reader, writer in client_conns.values():
+            writer.write(b'Cancelled')
+            await writer.drain()
+            writer.close()
+            await writer.wait_closed()
+            print(f"Client {writer.get_extra_info('peername')} disconnected.")
+        self.client_conns.clear()
+        self.clients_info.clear()
         print(f"Conference {self.conference_id} successfully cancelled.")
+        del self
         #self.loop.stop()
 
     def start(self):
@@ -167,7 +175,7 @@ class MainServer:
         """
         if conference_id in self.conference_servers:
             manager_addr = self.conference_servers[conference_id].manager
-            client_addr = str(addr).split(',')[0]
+            client_addr = addr
             if manager_addr != client_addr:
                 return "Permission denied"
             conference_server = self.conference_servers[conference_id]
@@ -178,7 +186,7 @@ class MainServer:
             response = f"Conference {conference_id} not found"
         return response
     async def request_handler(self, reader, writer):
-        data = await reader.read(100)
+        data = await reader.read(CONTROL_LINE_BUFFER)
         message = data.decode()
         addr = writer.get_extra_info('peername')
 
