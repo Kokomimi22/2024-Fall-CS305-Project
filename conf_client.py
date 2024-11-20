@@ -153,6 +153,17 @@ class ConferenceClient:
         # write is into a file
         print(f'[Info]: Received data: {self.recv_data}')
 
+
+    def save_img(self, img_data, img_path):
+        """
+        save image data to a file
+        :param img_data: bytes, image data
+        :param img_path: str, image file path
+        """
+        with open(img_path, 'wb') as f:
+            f.write(img_data)
+
+
     def start_conference(self):
         """
         init conns when create or join a conference with necessary conference_info
@@ -212,7 +223,7 @@ class ConferenceClient:
                 elif cmd_input == 'quit':
                     self.quit_conference()
                 elif cmd_input == 'cancel':
-                        self.cancel_conference()
+                    self.cancel_conference()
                 elif cmd_input == 'exit':
                     if self.on_meeting:
                         self.quit_conference()

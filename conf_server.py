@@ -51,8 +51,7 @@ class ConferenceServer:
                 message = data.decode()
                 if message.startswith('share'):
                     data_type = message.split()[1]
-                    if data_type in self.data_types:
-                        await self.handle_data(reader, writer, data_type)
+                    await self.handle_data(reader, writer, data_type)
                 elif message.startswith('quit'):
                     print(f"Client {addr} has requested to quit the conference.")
                     writer.write(b'Quitted')
@@ -64,17 +63,21 @@ class ConferenceServer:
         finally:
             del self.client_conns[addr]
             self.clients_info.remove(addr)
-            if not self.client_conns:
-                self.running = False
-                await self.cancel_conference()
-            writer.close()
-            await writer.wait_closed()
+            # judge if the writer is closed
+            if not writer.is_closing():
+                writer.write(b'Cancelled')
+                await writer.drain()
+                writer.close()
+                await writer.wait_closed()
+                print(f"Client {addr} has left the conference.")
 
     async def log(self):
-        while self.running:
-            print(f"Conference {self.conference_id} running with clients: {self.clients_info}")
-            await asyncio.sleep(5)
-
+        try:
+            while self.running:
+                print(f"Conference {self.conference_id} running with clients: {self.clients_info}")
+                await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            pass
     async def stop(self):
         self.running = False
         await self.cancel_conference()
@@ -85,18 +88,12 @@ class ConferenceServer:
         Disconnect all connections to cancel the conference.
         """
         print(f"Attempting to cancel conference {self.conference_id}...")
-        # copy the client_conns to avoid RuntimeError: dictionary changed size during iteration
-        client_conns = self.client_conns.copy()
-        for reader, writer in client_conns.values():
-            writer.write(b'Cancelled')
-            await writer.drain()
-            writer.close()
-            await writer.wait_closed()
-            print(f"Client {writer.get_extra_info('peername')} disconnected.")
-        self.client_conns.clear()
-        self.clients_info.clear()
-        print(f"Conference {self.conference_id} successfully cancelled.")
-        del self
+        # cancel all tasks
+        cancel_success = [task.cancel() for task in asyncio.all_tasks(self.loop) if task is not asyncio.current_task()]
+        if all(cancel_success):
+            print(f"Conference {self.conference_id} successfully cancelled.")
+        else:
+            print(f"Failed to cancel conference {self.conference_id}.")
         #self.loop.stop()
 
     def start(self):
@@ -114,12 +111,11 @@ class ConferenceServer:
             print(f"Error: {e}")
             self.loop.stop()
         finally:
-            server.close()
-            self.loop.run_until_complete(server.wait_closed())
-            #avoid RuntimeError: Event loop is closed
-            if self.running:
+            if not self.loop.is_closed():
+                server.close()
+                self.loop.run_until_complete(server.wait_closed())
                 self.loop.run_until_complete(self.cancel_conference())
-            self.loop.close()
+                self.loop.close()
 
 class MainServer:
     def __init__(self, server_ip, main_port):
@@ -176,8 +172,8 @@ class MainServer:
         if conference_id in self.conference_servers:
             manager_addr = self.conference_servers[conference_id].manager
             client_addr = addr
-            if manager_addr != client_addr:
-                return "Permission denied"
+            #if manager_addr != client_addr:
+            #    return "Permission denied"
             conference_server = self.conference_servers[conference_id]
             asyncio.run_coroutine_threadsafe(conference_server.stop(), conference_server.loop)
             del self.conference_servers[conference_id]
