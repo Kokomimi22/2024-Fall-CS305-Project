@@ -81,8 +81,10 @@ class ConferenceServer:
                 except (ConnectionResetError, BrokenPipeError):
                     print(f"Failed to send 'Cancelled' message to {addr} because the connection was closed.")
                 writer.close()
-                writer.close()
-                await writer.wait_closed()
+                try:
+                    await asyncio.wait_for(writer.wait_closed(), timeout=5)  # set a timeout to wait for the writer to close
+                except asyncio.TimeoutError:
+                    print(f"Waiting for {addr} to close timed out.")
                 print(f"Client {addr} has left the conference.")
             # judge if the manager has left the conference
             if user_uuid == self.manager and self.running:
@@ -131,7 +133,9 @@ class ConferenceServer:
             if not self.loop.is_closed():
                 server.close()
                 self.loop.run_until_complete(server.wait_closed())
-                self.loop.run_until_complete(self.cancel_conference())
+                if self.running:
+                    self.running = False
+                    self.loop.run_until_complete(self.cancel_conference())
                 self.loop.close()
 
 class MainServer:

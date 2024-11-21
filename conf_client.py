@@ -139,7 +139,7 @@ class ConferenceClient:
             while self.on_meeting:
                 _recv_data = recv_conn.recv(DATA_LINE_BUFFER)
                 if _recv_data == b'Quitted' or _recv_data == b'Cancelled':
-                    print(f'The conference {self.conference_id} has been ended.')
+                    print(f'You have left the conference {self.conference_id}')
                     self.close_conference()
                     break
                 if _recv_data:
