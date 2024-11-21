@@ -8,7 +8,7 @@ from pyexpat.errors import messages
 
 from config import *
 from util import *
-
+from user import *
 
 import asyncio
 
@@ -274,15 +274,15 @@ class MainServer:
                 pass
             finally:
                 for conference_server in self.conference_servers.values():
-                    await conference_server.cancel_conference()
+                    asyncio.run_coroutine_threadsafe(conference_server.stop(), conference_server.loop)
 
     def start(self):
         """
         start MainServer
         """
         print(f"MainServer started at {self.server_ip}:{self.server_port}")
-        asyncio.run(self.start_server())
         self.user_manager.load()
+        asyncio.run(self.start_server())
 
 
 if __name__ == '__main__':

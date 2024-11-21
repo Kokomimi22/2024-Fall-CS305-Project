@@ -113,15 +113,8 @@ class ConferenceClient:
         """
         self.conns.sendall(f'share {data_type}'.encode('utf-8'))
 
-        # cmd_input = input(f'Please transfer the data: ').strip().lower()
-        # while True:
-        #     self.conns.sendall(cmd_input.encode('utf-8'))
-        #     cmd_input = input(f'Is that over? ').strip().lower()
-        #     if cmd_input == 'yes':
-        #         self.conns.sendall(b'end')
-        #         break
-
         # test keep_share
+        _sharing_task = None
         if data_type == 'screen':
             _sharing_task = threading.Thread(target=self.keep_share, args=(data_type, self.conns, capture_screen, compress_image))
         elif data_type == 'camera':
@@ -260,6 +253,8 @@ class ConferenceClient:
             parse the command line input and execute the corresponding functions
             """
             cmd_input = cmd_input.strip().lower().strip()
+            if not cmd_input:
+                return True
             fields = cmd_input.split(maxsplit=2)
             if fields[0] in ('create', 'join', 'quit', 'cancel') and self.userInfo is None:
                 print('[Error]: Please login first')
@@ -278,6 +273,8 @@ class ConferenceClient:
                         self.logout()
                         self.quit_conference()
                     return False
+                elif cmd_input == 'logout':
+                    self.logout()
                 else:
                     print('[Error]: Invalid command' + '\r\n' + HELP)
             elif len(fields) == 2:
