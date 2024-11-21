@@ -75,14 +75,18 @@ class ConferenceServer:
             self.clients_info.remove(addr)
             # judge if the writer is closed
             if not writer.is_closing():
-                writer.write(b'Cancelled')
-                await writer.drain()
+                try:
+                    writer.write(b'Cancelled')
+                    await writer.drain()
+                except (ConnectionResetError, BrokenPipeError):
+                    print(f"Failed to send 'Cancelled' message to {addr} because the connection was closed.")
+                writer.close()
                 writer.close()
                 await writer.wait_closed()
                 print(f"Client {addr} has left the conference.")
             # judge if the manager has left the conference
             if user_uuid == self.manager and self.running:
-                await self.cancel_conference()
+                await self.stop()
 
     async def log(self):
         try:

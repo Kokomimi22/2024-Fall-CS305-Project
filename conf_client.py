@@ -66,6 +66,9 @@ class ConferenceClient:
         """
         quit your on-going conference
         """
+        if not self.on_meeting:
+            print(f'[Error]: You are not in a conference')
+            return
         self.conns.sendall(b'quit')
 
     def cancel_conference(self):
