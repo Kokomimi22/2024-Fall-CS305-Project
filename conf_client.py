@@ -29,7 +29,8 @@ class ConferenceClient:
         """
         if self.on_meeting:
             print(f'[Error]: You are already in a conference {self.conference_id}')
-            return
+            return f'[Error]: You are already in a conference {self.conference_id}'
+
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
             s.sendall(f'create with {self.userInfo.uuid}'.encode())
@@ -205,15 +206,8 @@ class ConferenceClient:
         """
         execute functions based on the command line input
         """
-        while self.is_working:
-            if not self.on_meeting:
-                status = 'Free'
-            else:
-                status = f'OnMeeting-{self.conference_id}'
+        pass
 
-            recognized = True
-            cmd_input = input(f'({status}) Please enter a operation (enter "?" to help): ').strip().lower()
-            self.is_working = self.command_parser(cmd_input)
     def register(self, username, password):
         """
         register a new user
@@ -263,12 +257,12 @@ class ConferenceClient:
             fields = cmd_input.split(maxsplit=2)
             if fields[0] in ('create', 'join', 'quit', 'cancel') and self.userInfo is None:
                 print('[Error]: Please login first')
-                return True
+                return '[Error]: Please login first'
             if len(fields) == 1:
                 if cmd_input in ('?', '？'):
                     print(HELP)
                 elif cmd_input == 'create':
-                    self.create_conference()
+                     return self.create_conference()
                 elif cmd_input == 'quit':
                     self.quit_conference()
                 elif cmd_input == 'cancel':
@@ -277,7 +271,6 @@ class ConferenceClient:
                     if self.on_meeting:
                         self.logout()
                         self.quit_conference()
-                    return False
                 else:
                     print('[Error]: Invalid command' + '\r\n' + HELP)
             elif len(fields) == 2:
@@ -299,8 +292,23 @@ class ConferenceClient:
                 else:
                     print('[Error]: Invalid command' + '\r\n' + HELP)
             else:
-                print('[Error]: Invalid command' + '\r\n' + HELP)
-            return True    
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.connect((SERVER_IP, MAIN_SERVER_PORT))
+                    s.sendall(cmd_input.encode())
+                    self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
+                    print(f'[Info]: {self.recv_data}')
+
+
+    def communicate(self, msg, wait_response=True):
+        """
+        communicate with server
+        """
+        try:
+            response = self.command_parser(msg)
+            return response
+        except Exception as e:
+            print(f'[Error]: {e}')
+            return f'[Error]: {e}'
 
 
 if __name__ == '__main__':

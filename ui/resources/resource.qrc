@@ -1,0 +1,9 @@
+<RCC>
+  <qresource>
+    <file>images/background.jpg</file>
+    <file>images/logo.png</file>
+    <file>images/living.gif</file>
+    <file>images/online.png</file>
+    <file>images/create.png</file>
+  </qresource>
+</RCC>
