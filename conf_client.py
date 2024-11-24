@@ -1,13 +1,17 @@
 import socket
+import sys
 import threading
 
+from PyQt5 import QtWidgets
+
+from ui.Ui_LoginWindow import Ui_Form
 from user import User
 from config import *
 from util import *
 
 
 class ConferenceClient:
-    def __init__(self,):
+    def __init__(self, ):
         # sync client
         self.userInfo = None
         self.recv_thread = None
@@ -15,7 +19,8 @@ class ConferenceClient:
         self.server_addr = None  # server addr
         self.on_meeting = False  # status
         self.conns = None  # you may need to maintain multiple conns for a single conference
-        self.support_data_types = ['screen', 'camera', 'audio']  # the data types that can be shared, which should be modified
+        self.support_data_types = ['screen', 'camera',
+                                   'audio']  # the data types that can be shared, which should be modified
         self.share_data = {}
         self.sharing_task = None
 
@@ -29,7 +34,8 @@ class ConferenceClient:
         """
         if self.on_meeting:
             print(f'[Error]: You are already in a conference {self.conference_id}')
-            return
+            return f'[Error]: You are already in a conference {self.conference_id}'
+
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
             s.sendall(f'create with {self.userInfo.uuid}'.encode())
@@ -62,6 +68,7 @@ class ConferenceClient:
                 self.start_conference()
             else:
                 print(f'[Error]: Failed to join conference {conference_id}')
+
     def quit_conference(self):
         """
         quit your on-going conference
@@ -119,15 +126,15 @@ class ConferenceClient:
         # test keep_share
         _sharing_task = None
         if data_type == 'screen':
-            _sharing_task = threading.Thread(target=self.keep_share, args=(data_type, self.conns, capture_screen, compress_image))
+            _sharing_task = threading.Thread(target=self.keep_share,
+                                             args=(data_type, self.conns, capture_screen, compress_image))
         elif data_type == 'camera':
-            _sharing_task = threading.Thread(target=self.keep_share, args=(data_type, self.conns, capture_camera, compress_image))
+            _sharing_task = threading.Thread(target=self.keep_share,
+                                             args=(data_type, self.conns, capture_camera, compress_image))
         elif data_type == 'audio':
             _sharing_task = threading.Thread(target=self.keep_share, args=(data_type, self.conns, capture_voice))
         self.sharing_task = _sharing_task
         _sharing_task.start()
-
-
 
     def keep_recv(self, recv_conn=None, data_type=None, decompress=None):
         """
@@ -139,11 +146,11 @@ class ConferenceClient:
             while self.on_meeting:
                 _recv_data = recv_conn.recv(DATA_LINE_BUFFER)
                 if _recv_data == b'Quitted' or _recv_data == b'Cancelled':
-                    print(f'You have left the conference {self.conference_id}')
+                    print(f'You have been quitted from the conference {self.conference_id}')
                     self.close_conference()
                     break
                 if _recv_data:
-                    self.recv_data = _recv_data # bytes concatenation
+                    self.recv_data = _recv_data  # bytes concatenation
                     self.output_data()
 
         self.recv_thread = threading.Thread(target=recv_task)
@@ -165,7 +172,6 @@ class ConferenceClient:
         with open(img_path, 'wb') as f:
             f.write(img_data)
 
-
     def start_conference(self):
         """
         init conns when create or join a conference with necessary conference_info
@@ -176,7 +182,6 @@ class ConferenceClient:
         self.conns.connect(self.server_addr)
         self.conns.sendall(f'init {self.userInfo.uuid}'.encode())
         self.keep_recv(recv_conn=self.conns, data_type='screen', decompress=None)
-
 
     def close_conference(self):
         """
@@ -201,16 +206,9 @@ class ConferenceClient:
         """
         execute functions based on the command line input
         """
-        while self.is_working:
-            if not self.on_meeting:
-                status = 'Free'
-            else:
-                status = f'OnMeeting-{self.conference_id}'
+        pass
 
-            recognized = True
-            cmd_input = input(f'({status}) Please enter a operation (enter "?" to help): ').strip().lower()
-            self.is_working = self.command_parser(cmd_input)
-    def register(self, username, password):
+    def register(self, username, password)->bool:
         """
         register a new user
         """
@@ -219,10 +217,11 @@ class ConferenceClient:
             s.sendall(f'register {username} {password}'.encode())
             self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
             if self.recv_data.startswith('Registered'):
-                print(f'[Info]: Registered successfully')
+                return SUCCESSFUL
             else:
-                print(f'[Error]: Failed to register')
-    def login(self, username, password):
+                return FAILED
+
+    def login(self, username, password)->bool:
         """
         login with username and password
         """
@@ -231,11 +230,11 @@ class ConferenceClient:
             s.sendall(f'login {username} {password}'.encode())
             self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
             if self.recv_data.startswith('Logged'):
-                print(f'[Info]: Logged in successfully')
                 uuid = self.recv_data.split(' ')[-1]
                 self.userInfo = User(uuid, username, password)
+                return SUCCESSFUL
             else:
-                print(f'[Error]: Failed to login')
+                return FAILED
 
     def logout(self):
         """
@@ -250,60 +249,68 @@ class ConferenceClient:
                 self.userInfo = None
             else:
                 print(f'[Error]: Failed to logout')
-                
+
     def command_parser(self, cmd_input):
-            """
+        """
             parse the command line input and execute the corresponding functions
             """
-            cmd_input = cmd_input.strip().lower().strip()
-            if not cmd_input:
-                return True
-            fields = cmd_input.split(maxsplit=2)
-            if fields[0] in ('create', 'join', 'quit', 'cancel') and self.userInfo is None:
-                print('[Error]: Please login first')
-                return True
-            if len(fields) == 1:
-                if cmd_input in ('?', '？'):
-                    print(HELP)
-                elif cmd_input == 'create':
-                    self.create_conference()
-                elif cmd_input == 'quit':
-                    self.quit_conference()
-                elif cmd_input == 'cancel':
-                    self.cancel_conference()
-                elif cmd_input == 'exit':
-                    if self.on_meeting:
-                        self.logout()
-                        self.quit_conference()
-                    return False
-                elif cmd_input == 'logout':
+        cmd_input = cmd_input.strip().lower().strip()
+        fields = cmd_input.split(maxsplit=2)
+        if fields[0] in ('create', 'join', 'quit', 'cancel') and self.userInfo is None:
+            print('[Error]: Please login first')
+            return '[Error]: Please login first'
+        if len(fields) == 1:
+            if cmd_input in ('?', '？'):
+                print(HELP)
+            elif cmd_input == 'create':
+                return self.create_conference()
+            elif cmd_input == 'quit':
+                self.quit_conference()
+            elif cmd_input == 'cancel':
+                self.cancel_conference()
+            elif cmd_input == 'exit':
+                if self.on_meeting:
                     self.logout()
-                else:
-                    print('[Error]: Invalid command' + '\r\n' + HELP)
-            elif len(fields) == 2:
-                arg = fields[1]
-                if fields[0] == 'join' and arg.isdigit():
-                    self.join_conference(arg)
-                elif fields[0] == 'switch' and arg in self.support_data_types:
-                    self.share_switch(arg)
-                elif fields[0] == 'share':
-                    self.share_switch(arg)
-                else:
-                    print('[Error]: Invalid command' + '\r\n' + HELP)
-            elif len(fields) == 3:
-                arg1, arg2 = fields[1], fields[2]
-                if fields[0] == 'register':
-                    self.register(arg1, arg2)
-                elif fields[0] == 'login':
-                    self.login(arg1, arg2)
-                else:
-                    print('[Error]: Invalid command' + '\r\n' + HELP)
+                    self.quit_conference()
             else:
                 print('[Error]: Invalid command' + '\r\n' + HELP)
-            return True    
+        elif len(fields) == 2:
+            arg = fields[1]
+            if fields[0] == 'join' and arg.isdigit():
+                self.join_conference(arg)
+            elif fields[0] == 'switch' and arg in self.support_data_types:
+                self.share_switch(arg)
+            elif fields[0] == 'share':
+                self.share_switch(arg)
+            else:
+                print('[Error]: Invalid command' + '\r\n' + HELP)
+        elif len(fields) == 3:
+            arg1, arg2 = fields[1], fields[2]
+            if fields[0] == 'register':
+                self.register(arg1, arg2)
+            elif fields[0] == 'login':
+                self.login(arg1, arg2)
+            else:
+                print('[Error]: Invalid command' + '\r\n' + HELP)
+        else:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((SERVER_IP, MAIN_SERVER_PORT))
+                s.sendall(cmd_input.encode())
+                self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
+                print(f'[Info]: {self.recv_data}')
+
+    def communicate(self, msg, wait_response=True):
+        """
+        communicate with server
+        """
+        try:
+            response = self.command_parser(msg)
+            return response
+        except Exception as e:
+            print(f'[Error]: {e}')
+            return f'[Error]: {e}'
 
 
 if __name__ == '__main__':
     client1 = ConferenceClient()
     client1.start()
-
