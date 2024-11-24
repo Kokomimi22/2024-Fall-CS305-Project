@@ -125,8 +125,9 @@ class ConferenceCard(QFrame):
         avatars_layout.maximumSize = QSize(100, 40)
         creatorFont = QFont()
         creatorFont.setPointSize(13)
-        creatorFont.setFamily('Microsoft YaHei')
-        self.creatorLabel = QLabel('创建者', self)
+        creatorFont.setFamily('Arial')
+        creatorFont.setBold(True)
+        self.creatorLabel = QLabel('Creator', self)
         self.creatorLabel.setStyleSheet('color: white;')
         self.creatorLabel.setAlignment(Qt.AlignCenter)
         self.creatorLabel.setFont(creatorFont)
@@ -205,7 +206,7 @@ class ConferenceCard(QFrame):
         dropShadowEffect.setOffset(0, 0)
         self.setGraphicsEffect(dropShadowEffect)
 
-        self.joinButton.setText('加入')
+        self.joinButton.setText('Join')
 
     def top_view(self):
         parent = self.parent()
@@ -218,53 +219,193 @@ class ConferenceCard(QFrame):
 
     def showMessageBox(self):
         w = MessageBox(
-            '加入会议',
-            '您确定要加入这个会议吗？',
+            'Join meeting',
+            'Do you want to join this meeting?',
             self.top_view()
         )
-        w.yesButton.setText('加入')
-        w.cancelButton.setText('取消')
+        w.yesButton.setText('Join')
+        w.cancelButton.setText('Cancel')
 
         if w.exec():
             QDesktopServices.openUrl(QUrl("https://www.google.com"))
 
-from qfluentwidgets import SingleDirectionScrollArea, TogglePushButton
+from qfluentwidgets import SingleDirectionScrollArea, TogglePushButton, HeaderCardWidget, FluentIcon, TitleLabel, ComboBox, SmoothScrollArea, ProgressBar, CardWidget
+from qfluentwidgets.multimedia import SimpleMediaPlayBar, MediaPlayer
+from qfluentwidgets.multimedia.media_play_bar import PlayButton, VolumeButton, MediaPlayBarBase, FluentStyleSheet
+from PyQt5.QtGui import QImage
+from PyQt5.QtWidgets import QGraphicsOpacityEffect, QVBoxLayout, QHBoxLayout, QSpacerItem, QSizePolicy, QWidget
+from PyQt5.QtCore import QPropertyAnimation
 
-class TestInterface(QFrame):
+class TestInterface(SmoothScrollArea):
+
+    class VideoPreviewCard(HeaderCardWidget):
+
+        DEFAULT_PREVIEW_HOLDER = QImage(640, 360, QImage.Format_RGB32)
+
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.setObjectName('Video-Preview-Card')
+            self.setTitle('Video Preview')
+            self.mainLayout = QVBoxLayout()
+            self.mainLayout.setSpacing(10)
+
+            self.topLayout = QHBoxLayout()
+
+            # initial screen preview
+            self.previewarea = ImageLabel(self)
+            self.previewarea.setBorderRadius(8, 8, 8, 8)
+            self.previewarea.setImage(self.DEFAULT_PREVIEW_HOLDER)
+            # self.previewarea.setMaximumWidth(500)
+
+            self.topLayout.addWidget(self.previewarea)
+            self.topLayout.addSpacerItem(QSpacerItem(50, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+
+            self.bottomLayout = QHBoxLayout()
+            self.hintLabel = BodyLabel('Current video input:', self)
+            self.hintLabel.setStyleSheet('color: #41b6bf;')
+            self.bottomLayout.addWidget(self.hintLabel)
+            self.selecsrcButton = ComboBox(self)
+            self.selecsrcButton.setPlaceholderText('Select Source from')
+
+            self.bottomLayout.addWidget(self.selecsrcButton)
+            self.bottomLayout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+
+            self.previewstartbutton = TogglePushButton(FluentIcon.PLAY, "start preview")
+            self.previewstartbutton.toggled.connect(self.handle_toggle)
+
+            self.bottomLayout.addWidget(self.previewstartbutton)
+            self.bottomLayout.addSpacerItem(QSpacerItem(220, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+
+            self.mainLayout.addLayout(self.topLayout)
+            self.mainLayout.addLayout(self.bottomLayout)
+            self.viewLayout.addLayout(self.mainLayout)
+
+
+        def handle_toggle(self, checked):
+            if checked:
+                self.previewstartbutton.setIcon(FluentIcon.PAUSE)
+                self.previewstartbutton.setText('stop preview')
+            else:
+                self.previewstartbutton.setIcon(FluentIcon.PLAY)
+                self.previewstartbutton.setText('start preview')
+
+    class SoundPreviewCard(HeaderCardWidget):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.setObjectName('Sound-Test-Card')
+            self.setTitle('Sound Test')
+            self.mainLayout = QVBoxLayout()
+            self.mainLayout.setSpacing(20)
+
+            self.topLayout = QHBoxLayout()
+
+            # initial sound preview
+            self.previewarea = self.SoundVisualizer(self)
+            self.previewarea.setFixedHeight(48)
+            self.mainLayout.addWidget(self.previewarea)
+    
+
+            self.hintLabel = BodyLabel('Current audio input:', self)
+            self.hintLabel.setStyleSheet('color: #41b6bf;')
+            self.topLayout.addWidget(self.hintLabel)
+            self.selecsrcButton = ComboBox(self)
+            self.selecsrcButton.setPlaceholderText('Select Source from')
+
+            self.topLayout.addWidget(self.selecsrcButton)
+            self.topLayout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+
+            self.topLayout.addSpacerItem(QSpacerItem(220, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+
+            self.mainLayout.addLayout(self.topLayout)
+            self.viewLayout.addLayout(self.mainLayout)
+
+        # def handle_toggle(self, checked):
+        #     if checked:
+        #         self.previewstartbutton.setIcon(FluentIcon.PAUSE)
+        #         self.previewstartbutton.setText('stop')
+        #     else:
+        #         self.previewstartbutton.setIcon(FluentIcon.PLAY)
+        #         self.previewstartbutton.setText('play')
+
+        class SoundVisualizer(CardWidget):
+            def __init__(self, parent=None):
+                super().__init__(parent)
+                self.player = None  # type: MediaPlayerBase
+
+                self.playButton = PlayButton(self)
+                self.volumeButton = VolumeButton(self)
+                self.volumeButton.volumeView.volumeLabel.hide()
+                self.progressSlider = ProgressBar(self)
+                self.progressSlider.setRange(0, 100)
+                self.progressSlider.setMaximumWidth(400)
+
+                FluentStyleSheet.MEDIA_PLAYER.apply(self)
+
+                self.hBoxLayout = QHBoxLayout(self)
+
+                self.hBoxLayout.setContentsMargins(10, 4, 10, 4)
+                self.hBoxLayout.setSpacing(6)
+                self.hBoxLayout.addWidget(self.playButton, 0, Qt.AlignLeft)
+                self.hBoxLayout.addWidget(self.progressSlider, 1)
+                self.hBoxLayout.addWidget(self.volumeButton, 0)
+
+                self.setFixedHeight(48)
+                self.setFixedWidth(500)
+                # self.setMediaPlayer(MediaPlayer(self))
+                
+            
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName('Test-Interface')
-        self.vbox = QVBoxLayout(self)
-        self.vbox.setContentsMargins(10, 10, 10, 10)
+        self.setStyleSheet("""
+            #Test-Interface {
+                background: transparent;
+                }
+        """)
+
+        self.body = QWidget(self)
+        self.body.setObjectName('Test-Interface-Body')
+        self.body.setStyleSheet("""
+            #Test-Interface-Body {
+                background: transparent;
+                }
+        """)
+
+        self.vbox = QVBoxLayout(self.body)
+        self.vbox.setContentsMargins(20, 10, 20, 10)
         self.vbox.setSpacing(0)
-        self.subhbox = QHBoxLayout()
 
-        # initial screen preview
-        self.previewarea = ImageLabel(self)
-        self.previewarea.setBorderRadius(8, 8, 8, 8)
-        self.previewarea.setMaximumWidth(500)
+        self.title = TitleLabel('Test your equipment', self)
+        self.title.setAlignment(Qt.AlignCenter)
+        self.vbox.addWidget(self.title, alignment=Qt.AlignLeft)
+        self.subtitle = CaptionLabel('Check your camera and microphone', self)
+        self.subtitle.setStyleSheet('color: gray;')
+        self.subtitle.setAlignment(Qt.AlignCenter)
+        self.vbox.addWidget(self.subtitle, alignment=Qt.AlignLeft)
 
-        self.previewstartbutton = TogglePushButton("start preview")
+        self.vbox.addSpacerItem(QSpacerItem(20, 50, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
-        self.subhbox.addWidget(self.previewarea, alignment=Qt.AlignCenter)
-        self.subhbox.addWidget(self.previewstartbutton, alignment=Qt.AlignCenter)
-        self.vbox.addLayout(self.subhbox)
+        self.previewarea = self.VideoPreviewCard(self)
+        self.vbox.addWidget(self.previewarea)
+
+        self.vbox.addSpacerItem(QSpacerItem(20, 50, QSizePolicy.Minimum, QSizePolicy.Expanding))
+
+        self.soundpreviewarea = self.SoundPreviewCard(self)
+        self.vbox.addWidget(self.soundpreviewarea)
+        
+        self.setWidget(self.body)
 
     def set_preview(self, img):
-        self.previewarea.setImage(img)
-        self.previewarea.setMaximumHeight(360)
+        '''
+        :param img: QImage
+        '''
+        if isinstance(img, QImage):
+            img = img.scaled(640, 360)
+        self.previewarea.previewarea.setImage(img)
 
-from qfluentwidgets import PrimaryToolButton
+from qfluentwidgets import PrimaryToolButton, SearchLineEdit, RoundMenu, Action
 from PyQt5.QtWidgets import QSpacerItem, QSizePolicy
-def isWin11():
-    return sys.platform == 'win32' and sys.getwindowsversion().build >= 22000
-
-
-if isWin11():
-    from qframelesswindow import AcrylicWindow as Window
-else:
-    from qframelesswindow import FramelessWindow as Window
 
 class HomeInterface(QFrame):
 
@@ -276,29 +417,40 @@ class HomeInterface(QFrame):
 
         self.setObjectName('Home-Interface')
         self.mainLayout = QVBoxLayout(self)
-        self.mainLayout.setContentsMargins(20, 20, 20, 20)
+        self.mainLayout.setContentsMargins(20, 0, 20, 20)
         self.mainLayout.setSpacing(10)
 
+        # load heading pic
+        self.heading = ImageLabel(':/images/home_background.png', self)
+        self.mainLayout.addWidget(self.heading, alignment=Qt.AlignCenter, stretch=0)
+
         # create a subtitle label "Start your first meeting/开始你的第一个会议"
-        self.firstLabel = SubtitleLabel('开始你的第一个会议', self)
+        self.firstLabel = SubtitleLabel('Start your first meeting', self)
         self.firstLabel.setAlignment(Qt.AlignCenter)
-        self.mainLayout.addWidget(self.firstLabel, alignment=Qt.AlignLeft, stretch=5)
+        self.mainLayout.addWidget(self.firstLabel, alignment=Qt.AlignLeft, stretch=0)
 
         # spacerItem = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
         # self.mainLayout.addItem(spacerItem)
 
         # create a labelbutton "Create Meeting/创建会议" in the center 50 * 50
         self.createButton = PrimaryToolButton(self.CREATE_ICON_PATH, self)
-        self.mainLayout.addWidget(self.createButton, alignment=Qt.AlignCenter, stretch=11)
+        self.mainLayout.addWidget(self.createButton, alignment=Qt.AlignCenter, stretch=15)
 
         # create a subtitle label "on-going meetings/正在进行的会议 " in the center
         self.midBox = QHBoxLayout()
         self.onlineIcon = ImageLabel(self.ONLINE_ICON_PATH, self)
         self.onlineIcon.setFixedSize(30, 30)
-        self.secondLabel = SubtitleLabel('正在进行的会议', self)
+        self.secondLabel = SubtitleLabel('On-going meetings', self)
         self.secondLabel.setAlignment(Qt.AlignCenter)
-        self.midBox.addWidget(self.onlineIcon, alignment=Qt.AlignLeft, stretch=0)
-        self.midBox.addWidget(self.secondLabel, alignment=Qt.AlignLeft, stretch=12)
+        self.midBox.setContentsMargins(10, 0, 10, 0)
+        self.midBox.addWidget(self.onlineIcon, alignment=Qt.AlignCenter, stretch=0)
+        self.midBox.addWidget(self.secondLabel, alignment=Qt.AlignCenter, stretch=1)
+
+        self.searchedit = SearchLineEdit(self)
+        self.searchedit.setPlaceholderText('Search meetings...')
+        self.searchedit.setFixedWidth(200)
+        self.midBox.addWidget(self.searchedit, alignment=Qt.AlignCenter, stretch=2)
+        self.midBox.addSpacerItem(QSpacerItem(350, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
         self.mainLayout.addLayout(self.midBox)
         # self.mainLayout.addStretch()
@@ -328,7 +480,48 @@ class HomeInterface(QFrame):
         self.scrollArea.setFrameShape(QFrame.NoFrame)
         self.mainLayout.addWidget(self.scrollArea)
 
+class NavigationAvatarWidget(NavigationAvatarWidget):
+    '''
+    override the click event
+    '''
+    def __init__(self, name: str, avatarPath: str, parent=None):
+        super().__init__(name, avatarPath, parent)
 
+    def mousePressEvent(self, e):
+        super().mousePressEvent(e)
+        if e.button() == Qt.LeftButton:
+            self.createProfileWidget(e)
+            
+
+    class ProfileCard(QWidget):
+
+        def __init__(self, avatarPath: str, name: str, email: str, parent=None):
+            super().__init__(parent=parent)
+            self.avatar = AvatarWidget(avatarPath, self)
+            self.nameLabel = BodyLabel(name, self)
+            self.emailLabel = CaptionLabel(email, self)
+
+            self.setFixedSize(307, 82)
+            self.avatar.setRadius(24)
+            self.avatar.move(2, 6)
+            self.nameLabel.move(64, 13)
+            self.emailLabel.move(64, 32)
+
+    def createProfileWidget(self, e, name='zhiyoko', email='shokokawaii@outlook.com', avatarPath='resources/shoko.png'):
+        menu = RoundMenu(self)
+        card = self.ProfileCard(avatarPath, name, email, menu)
+        menu.addWidget(card, selectable=False)
+
+        menu.addSeparator()
+        menu.addActions([
+            Action(FluentIcon.PEOPLE, 'Manage Account'),
+            Action(FluentIcon.CANCEL, 'Logout'),
+        ])
+        menu.addSeparator()
+        menu.addAction(Action(FluentIcon.SETTING, 'Settings'))
+
+        self.menu = menu
+        menu.exec(e.globalPos())
 
 class Main(FluentWindow):
 
@@ -353,7 +546,7 @@ class Main(FluentWindow):
         self.navigationInterface.addWidget(
             routeKey='avatar',
             widget=NavigationAvatarWidget('zhiyiYo', 'resources/shoko.png'),
-            # onClick=self.showMessageBox,
+            onClick=None,
             position=NavigationItemPosition.BOTTOM,
         )
 
@@ -384,12 +577,11 @@ def show():
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
 
     app = QApplication(sys.argv)
-
     # Internationalization
     translator = FluentTranslator(QLocale())
     app.installTranslator(translator)
 
-    w = LoginWindow()
+    w = Main()
     w.show()
     app.exec_()
 
