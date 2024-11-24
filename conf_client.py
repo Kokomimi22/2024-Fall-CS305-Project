@@ -1,11 +1,39 @@
 import socket
+import sys
 import threading
 
+from PyQt5 import QtWidgets
+
+from ui.Ui_LoginWindow import Ui_Form
 from user import User
 from config import *
 from util import *
+class LoginWindow(QtWidgets.QWidget):
+    def __init__(self, client = None):
+        super().__init__()
+        self.ui = Ui_Form()
+        self.ui.setupUi(self)
+        self.client = client
+        self.ui.pushButton.clicked.connect(self.login)
+        self.ui.pushButton_2.clicked.connect(self.recover_password)
+        self.ui.pushButton_3.clicked.connect(self.register)
 
+    def login(self):
+        username = self.ui.lineEdit_3.text()
+        password = self.ui.lineEdit_4.text()
+        # 在这里添加登录逻辑
+        self.client.login(username, password)
+        print(f"Logging in with username: {username} and password: {password}")
 
+    def recover_password(self):
+        # 在这里添加找回密码逻辑
+        self.client.recover_password()
+        print("Recover password")
+
+    def register(self):
+        # 在这里添加注册逻辑
+        self.client.register()
+        print("Register new user")
 class ConferenceClient:
     def __init__(self,):
         # sync client
@@ -202,7 +230,11 @@ class ConferenceClient:
         """
         execute functions based on the command line input
         """
-        pass
+        app = QtWidgets.QApplication([])
+        window = LoginWindow(self)
+        window.show()
+        sys.exit(app.exec_())
+
 
     def register(self, username, password):
         """

@@ -6,7 +6,7 @@ from PyQt5.QtGui import QIcon, QPixmap, QColor
 from PyQt5.QtWidgets import QApplication
 from qfluentwidgets import setThemeColor, FluentTranslator, setTheme, Theme, SplitTitleBar, isDarkTheme
 from qfluentwidgets import InfoBar, InfoBarPosition
-from .Ui_LoginWindow import Ui_Form
+from Ui_LoginWindow import Ui_Form
 
 
 def isWin11():
