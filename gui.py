@@ -1,6 +1,6 @@
 from qfluentwidgets import FluentTranslator, SplashScreen
 
-from PyQt5.QtCore import QEventLoop, QTimer, QSize, QLocale
+from PyQt5.QtCore import QEventLoop, QTimer, QSize, QLocale, pyqtSignal
 
 from ui.loginscreen import LoginWindow
 from uiconfig import *
@@ -12,29 +12,33 @@ from util import *
 import sys
 
 class LoginWindow(LoginWindow):
-
+    close_signal = pyqtSignal()
     def __init__(self):
         super().__init__()
-        
+
         # 1. 创建启动页面
+        self.loop = None
         self.splashScreen = SplashScreen(self.windowIcon(), self)
         self.splashScreen.setIconSize(QSize(102, 102))
 
         # 2. 在创建其他子页面前先显示主界面
         self.show()
 
-        self.createSubInterface()
         # 3. 创建子界面
-        
+        self.createSubInterface()
 
         # 4. 隐藏启动页面
         self.splashScreen.finish()
 
     def createSubInterface(self):
-        loop = QEventLoop()
-        QTimer.singleShot(1000, loop.quit)
-        loop.exec_()
-
+        self.loop = QEventLoop()
+        QTimer.singleShot(1000, self.loop.quit)
+        self.loop.exec_()
+    def closeEvent(self, event):
+        self.close_signal.emit()
+        if self.loop and self.loop.isRunning():
+            self.loop.quit()
+        event.accept()
 # Main window
 import sys
 
@@ -331,10 +335,9 @@ class HomeInterface(QFrame):
 
 
 class Main(FluentWindow):
-
+    close_signal = pyqtSignal()
     def __init__(self):
         super().__init__()
-
         # create sub interface
         self.homeInterface = HomeInterface(self)
         self.testInterface = TestInterface(self)
@@ -375,7 +378,9 @@ class Main(FluentWindow):
         # set the minimum window width that allows the navigation panel to be expanded
         # self.navigationInterface.setMinimumExpandWidth(900)
         # self.navigationInterface.expand(useAni=False)
-
+    def closeEvent(self, event):
+        self.close_signal.emit()
+        event.accept()
 def show():
     # enable dpi scale
     QApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -392,6 +397,6 @@ def show():
     w = LoginWindow()
     w.show()
     app.exec_()
-
+    sys.exit(app.exec_())
 if __name__ == '__main__':
     show()
