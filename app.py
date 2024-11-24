@@ -146,8 +146,6 @@ if __name__ == '__main__':
     controller = AppController(mainui, loginui=loginui)
     controller.start()
 
-    controller.switch_ui('main') # for test
-
     app.exec_()
 
     
