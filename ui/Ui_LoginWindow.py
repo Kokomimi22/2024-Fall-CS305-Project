@@ -12,6 +12,23 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 
 class Ui_Form(object):
+    def __init__(self):
+        self.pushButton = None
+        self.gridLayout_2 = None
+        self.checkBox = None
+        self.lineEdit_4 = None
+        self.pushButton_3 = None
+        self.label_6 = None
+        self.lineEdit_3 = None
+        self.label_5 = None
+        self.gridLayout = None
+        self.label_2 = None
+        self.verticalLayout_2 = None
+        self.widget = None
+        self.label = None
+        self.horizontalLayout = None
+        self.pushButton_2 = None
+
     def setupUi(self, Form):
         Form.setObjectName("Form")
         Form.resize(1250, 809)
@@ -35,8 +52,8 @@ class Ui_Form(object):
         self.widget.setMinimumSize(QtCore.QSize(360, 0))
         self.widget.setMaximumSize(QtCore.QSize(360, 16777215))
         self.widget.setStyleSheet("QLabel{\n"
-"    font: 13px \'Microsoft YaHei\'\n"
-"}")
+                                  "    font: 13px \'Microsoft YaHei\'\n"
+                                  "}")
         self.widget.setObjectName("widget")
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.widget)
         self.verticalLayout_2.setContentsMargins(20, 20, 20, 20)
@@ -133,5 +150,7 @@ class Ui_Form(object):
         self.pushButton.setText(_translate("Form", "登录"))
         self.pushButton_2.setText(_translate("Form", "找回密码"))
         self.pushButton_3.setText(_translate("Form", "注册"))
+
+
 from qfluentwidgets import BodyLabel, CheckBox, HyperlinkButton, LineEdit, PrimaryPushButton, PushButton
 from .resources import rc

@@ -36,10 +36,11 @@ class UserManager:
         uuid = self.UUIDManager.generate_uuid()
         user = User(uuid, username, password)
         self.users[uuid] = user
+        self.save()
         return user
 
     def login(self, username, password):
-        user = self.users.get_byname(username)
+        user = self.get_byname(username)
         if user and user.password == password:
             user.is_active = True
             return user
@@ -75,11 +76,11 @@ class UserManager:
         return None
 
     def is_active(self, uuid):
-        '''
+        """
         check if user is active, for some login required operations
         :param uuid: str, uuid in hex
         :return: bool, True if user is active
-        '''
+        """
         return self.users.get(uuid).is_active
 
     def load(self):

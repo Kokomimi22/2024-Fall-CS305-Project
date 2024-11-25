@@ -1,12 +1,12 @@
 
 import sys
 
-from PyQt5.QtCore import Qt, QTranslator, QLocale, QRect, Qt
+from PyQt5.QtCore import Qt, QTranslator, QLocale, QRect, Qt, pyqtSignal
 from PyQt5.QtGui import QIcon, QPixmap, QColor
 from PyQt5.QtWidgets import QApplication
 from qfluentwidgets import setThemeColor, FluentTranslator, setTheme, Theme, SplitTitleBar, isDarkTheme
 from qfluentwidgets import InfoBar, InfoBarPosition
-from .Ui_LoginWindow import Ui_Form
+from ui.Ui_LoginWindow import Ui_Form
 
 
 def isWin11():
@@ -20,7 +20,6 @@ else:
 
 
 class LoginWindow(Window, Ui_Form):
-
     def __init__(self):
         super().__init__()
         self.setupUi(self)
@@ -71,9 +70,9 @@ class LoginWindow(Window, Ui_Form):
         return QRect(size.width() - 75, 0, 75, size.height())
 
     def info(self, info_level, title, msg, pos=InfoBarPosition.TOP, orient=Qt.Orientation.Horizontal):
-        '''
+        """
         generate toast-like infobar
-        '''
+        """
         if info_level == 'success':
             InfoBar.success(
                 title=title,
@@ -116,8 +115,6 @@ class LoginWindow(Window, Ui_Form):
             )
         else:
             raise ValueError('Invalid info_level')
-
-
 if __name__ == '__main__':
     pass
 

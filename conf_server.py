@@ -8,7 +8,7 @@ from pyexpat.errors import messages
 
 from config import *
 from util import *
-
+from user import *
 
 import asyncio
 
@@ -75,14 +75,20 @@ class ConferenceServer:
             self.clients_info.remove(addr)
             # judge if the writer is closed
             if not writer.is_closing():
-                writer.write(b'Cancelled')
-                await writer.drain()
+                try:
+                    writer.write(b'Cancelled')
+                    await writer.drain()
+                except (ConnectionResetError, BrokenPipeError):
+                    print(f"Failed to send 'Cancelled' message to {addr} because the connection was closed.")
                 writer.close()
-                await writer.wait_closed()
+                try:
+                    await asyncio.wait_for(writer.wait_closed(), timeout=5)  # set a timeout to wait for the writer to close
+                except asyncio.TimeoutError:
+                    print(f"Waiting for {addr} to close timed out.")
                 print(f"Client {addr} has left the conference.")
             # judge if the manager has left the conference
             if user_uuid == self.manager and self.running:
-                await self.cancel_conference()
+                await self.stop()
 
     async def log(self):
         try:
@@ -127,7 +133,9 @@ class ConferenceServer:
             if not self.loop.is_closed():
                 server.close()
                 self.loop.run_until_complete(server.wait_closed())
-                self.loop.run_until_complete(self.cancel_conference())
+                if self.running:
+                    self.running = False
+                    self.loop.run_until_complete(self.cancel_conference())
                 self.loop.close()
 
 class MainServer:
@@ -274,15 +282,15 @@ class MainServer:
                 pass
             finally:
                 for conference_server in self.conference_servers.values():
-                    await conference_server.cancel_conference()
+                    asyncio.run_coroutine_threadsafe(conference_server.stop(), conference_server.loop)
 
     def start(self):
         """
         start MainServer
         """
         print(f"MainServer started at {self.server_ip}:{self.server_port}")
-        asyncio.run(self.start_server())
         self.user_manager.load()
+        asyncio.run(self.start_server())
 
 
 if __name__ == '__main__':
