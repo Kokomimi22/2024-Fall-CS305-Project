@@ -406,35 +406,113 @@ class TestInterface(SmoothScrollArea):
 
 from qfluentwidgets import PrimaryToolButton, SearchLineEdit, RoundMenu, Action
 from PyQt5.QtWidgets import QSpacerItem, QSizePolicy
+from PyQt5.QtGui import QPainter, QPainterPath, QLinearGradient, QBrush, QMovie
+from PyQt5.QtCore import QRectF, Qt, QSize
+
+class BannerWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName('Banner-Widget')
+        self.setFixedHeight(346)
+
+        self.mainLayout = QVBoxLayout(self)
+        self.title = TitleLabel('Online meeting room', self)
+        self.starterLabel = SubtitleLabel('Start your first meeting', self)
+        self.banner = QImage(':/images/header.png')
+
+
+        self.createButton = CreateButton(self)
+
+        self.mainLayout.setContentsMargins(20, 0, 20, 0)
+        self.mainLayout.setSpacing(10)
+
+        self.title.setAlignment(Qt.AlignCenter)
+        self.mainLayout.addWidget(self.title, alignment=Qt.AlignLeft)
+
+        self.mainLayout.addSpacerItem(QSpacerItem(20, 110, QSizePolicy.MinimumExpanding, QSizePolicy.Fixed))
+
+        self.mainLayout.addWidget(self.starterLabel, alignment=Qt.AlignLeft)
+        self.mainLayout.addWidget(self.createButton, alignment=Qt.AlignCenter)
+        self.mainLayout.addSpacerItem(QSpacerItem(20, 10, QSizePolicy.MinimumExpanding, QSizePolicy.Fixed))
+
+    def paintEvent(self, e):
+        painter = QPainter(self)
+        painter.setRenderHints(
+            QPainter.Antialiasing | QPainter.SmoothPixmapTransform
+        )
+        painter.setPen(Qt.NoPen)
+
+        path = QPainterPath()
+        path.setFillRule(Qt.WindingFill)
+        w, h = self.width(), 241
+        path.addRoundedRect(QRectF(0, 0, w, h), 10, 10)
+        path.addRect(QRectF(0, h-50, 50, 50))
+        path.addRect(QRectF(w-50, 0, 50, 50))
+        path.addRect(QRectF(w-50, h-50, 50, 50))
+        path = path.simplified()
+        print(self.size())
+
+        gradient = QLinearGradient(0, 0, 0, self.height())
+        # draw background color
+
+        gradient.setColorAt(0, QColor(207, 216, 228, 255))
+        gradient.setColorAt(1, QColor(207, 216, 228, 0))
+        # painter.fillPath(path, QBrush(gradient))
+
+        qimage = self.banner.scaled(
+           QSize(w, h), transformMode=Qt.SmoothTransformation)
+
+        painter.fillPath(path, QBrush(qimage))
+
+class CreateButton(QPushButton):
+
+
+    CREATE_ICON_PATH = ':/images/create.png'
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName('Create-Button')
+        self.setFixedSize(74, 74)
+        self.setStyleSheet("""
+            QPushButton#Create-Button {
+                background-color: #ff9c1a;
+                color: white;
+                border-radius: 25px;
+                }
+            QPushButton#Create-Button:hover {
+                background-color: #f1a644
+                }
+            QPushButton#Create-Button:pressed {
+                background-color: #c7c4bf
+                }
+        """)
+        self.setIcon(QIcon(self.CREATE_ICON_PATH))
+        self.setIconSize(QSize(55, 55))
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(10)
+        shadow.setColor(QColor(0, 0, 0, 100))
+        shadow.setOffset(0, 0)
+        self.setGraphicsEffect(shadow)
+
+
 
 class HomeInterface(QFrame):
 
-    CREATE_ICON_PATH = ':/images/create.png'
     ONLINE_ICON_PATH = ':/images/online.png'
 
     def __init__(self, parent=None):
         super().__init__(parent)
 
         self.setObjectName('Home-Interface')
-        self.mainLayout = QVBoxLayout(self)
-        self.mainLayout.setContentsMargins(20, 0, 20, 20)
+        self.body = QVBoxLayout(self)
+        self.body.setContentsMargins(0, 0, 0, 0)
+        self.mainLayout = QVBoxLayout()
+        self.mainLayout.setContentsMargins(20, 0, 20, 0)
         self.mainLayout.setSpacing(10)
 
-        # load heading pic
-        self.heading = ImageLabel(':/images/home_background.png', self)
-        self.mainLayout.addWidget(self.heading, alignment=Qt.AlignCenter, stretch=0)
-
-        # create a subtitle label "Start your first meeting/开始你的第一个会议"
-        self.firstLabel = SubtitleLabel('Start your first meeting', self)
-        self.firstLabel.setAlignment(Qt.AlignCenter)
-        self.mainLayout.addWidget(self.firstLabel, alignment=Qt.AlignLeft, stretch=0)
-
-        # spacerItem = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        # self.mainLayout.addItem(spacerItem)
-
-        # create a labelbutton "Create Meeting/创建会议" in the center 50 * 50
-        self.createButton = PrimaryToolButton(self.CREATE_ICON_PATH, self)
-        self.mainLayout.addWidget(self.createButton, alignment=Qt.AlignCenter, stretch=15)
+        # create a banner widget
+        self.banner = BannerWidget(self)
+        self.body.addWidget(self.banner)
 
         # create a subtitle label "on-going meetings/正在进行的会议 " in the center
         self.midBox = QHBoxLayout()
@@ -453,6 +531,7 @@ class HomeInterface(QFrame):
         self.midBox.addSpacerItem(QSpacerItem(350, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
         self.mainLayout.addLayout(self.midBox)
+        self.body.addLayout(self.mainLayout)
         # self.mainLayout.addStretch()
 
         # create a scroll area for conference cards
