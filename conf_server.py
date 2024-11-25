@@ -1,14 +1,7 @@
-import asyncio
-import json
 import random
 import threading
-from http.client import responses
 
-from pyexpat.errors import messages
-
-from config import *
-from util import *
-from user import *
+from common.user import *
 
 import asyncio
 

@@ -1,16 +1,12 @@
-import threading
+from view.gui import Main
+from view.gui import LoginWindow
+from view.gui import TestInterface
 
-from Demos.win32netdemo import server
-
-from gui import Main
-from gui import LoginWindow
-from gui import TestInterface
-
-from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, Qt
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtGui import QImage
 
 from util import *
-from conf_client import ConferenceClient
+from common.conf_client import ConferenceClient
 import sys
 
 conf_client = None
@@ -74,7 +70,7 @@ class LoginController:
         server_response = conf_client.login(username, password)
         if server_response:
             self.loginui.info('success', 'Success', 'Log in successfully')
-            # switch to main ui
+            # switch to main view
             self.switch_to_main()
         else:
             self.loginui.info('error', 'Error', 'Username or password is incorrect')
@@ -97,7 +93,7 @@ class LoginController:
             self.loginui.info('error', 'Error', 'Failed to register')
 
     def switch_to_main(self):
-        # switch to main ui
+        # switch to main view
         self.app.switch_ui('main')
         pass
 
@@ -134,7 +130,7 @@ class TestController:
         self.app = app
 
     def register_all_action(self):
-        self.interface.previewstartbutton.toggled.connect(self.toggle_preview)
+        self.interface.previewarea.previewstartbutton.toggled.connect(self.toggle_preview)
 
     def toggle_preview(self):
         self.is_preview = not self.is_preview
