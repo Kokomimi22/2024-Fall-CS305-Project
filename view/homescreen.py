@@ -49,7 +49,6 @@ class BannerWidget(QWidget):
         path.addRect(QRectF(w-50, 0, 50, 50))
         path.addRect(QRectF(w-50, h-50, 50, 50))
         path = path.simplified()
-        print(self.size())
 
         gradient = QLinearGradient(0, 0, 0, self.height())
         # draw background color
@@ -102,10 +101,10 @@ from PyQt5.QtWidgets import QLabel, QPushButton, QFrame, QGraphicsDropShadowEffe
 class ConferenceCard(QFrame):
     LIVING_ICON_PATH = ':/images/living.gif'
 
-    def __init__(self, title, avartar, id, parent=None):
+    def __init__(self, title, avatar, id, parent=None):
         '''
         title: str
-        avartar: list[IconWidget]
+        avatar: list[IconWidget]
         id: str
         icon: str
         '''
@@ -113,8 +112,8 @@ class ConferenceCard(QFrame):
 
         self.id = id
 
-        avartar = AvatarWidget(self)
-        avartar.setText('Z')
+        avatar = AvatarWidget(self)
+        avatar.setText('Z')
 
         self.mainLayout = QVBoxLayout(self)
         self.mainLayout.setContentsMargins(20, 20, 20, 20)
@@ -165,17 +164,17 @@ class ConferenceCard(QFrame):
         self.creatorLabel.setAlignment(Qt.AlignCenter)
         self.creatorLabel.setFont(creatorFont)
         avatars_layout.setSpacing(10)
-        avartar.setRadius(20)
+        avatar.setRadius(20)
         # avatar.setStyleSheet("border-radius: 20px; border: 2px solid white;")
-        avartar.setAlignment(Qt.AlignCenter)
-        avartar.setStyleSheet("""
+        avatar.setAlignment(Qt.AlignCenter)
+        avatar.setStyleSheet("""
             border-radius: 20px;
             border: 1px solid white;
             """)
         self.livingLabel = ImageLabel(self.LIVING_ICON_PATH, self)
 
         avatars_layout.addWidget(self.creatorLabel, 0, Qt.AlignCenter)
-        avatars_layout.addWidget(avartar, 0, Qt.AlignCenter)
+        avatars_layout.addWidget(avatar, 0, Qt.AlignCenter)
         avatars_layout.addWidget(self.livingLabel, 0, Qt.AlignCenter)
 
         self.bottomLayout.addLayout(avatars_layout)

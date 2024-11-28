@@ -306,7 +306,7 @@ class ConferenceClient:
             print(f'[Error]: {e}')
             return f'[Error]: {e}'
 
-
+import ast
 
 class Result(object):
     def __init__(self):
@@ -337,13 +337,10 @@ class Result(object):
         return self.status == self.Status.SUCCESS
 
     def __repr__(self):
-        return f"""
-            Result: [
-                status: {self.status},
-                response: {self.response},
-                message: {self.message}
-            ]
-        """
+        return f"Result({self.status}, {self.response}, {self.message})"
+
+    def __eq__(self, other):
+        return self.status == other.status and self.response == other.response and self.message == other.message
 
     # for jsonify
     def to_dict(self):
@@ -359,7 +356,7 @@ class Result(object):
     @staticmethod
     def from_dict(d):
         try:
-            status = Result.Status[d['status']]
+            status = Result.Status.SUCCESS if d['status'] == 0 else Result.Status.FAILED
             response = d['response']
             message = d['message']
             return Result(status, response, message)
@@ -368,7 +365,8 @@ class Result(object):
 
     @staticmethod
     def from_json(json_str):
-        return Result.from_dict(json.loads(json_str))
+        d = ast.literal_eval(json_str)
+        return Result.from_dict(d)
 
     class Status(Enum):
         SUCCESS = 0
