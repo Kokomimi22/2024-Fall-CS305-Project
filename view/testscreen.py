@@ -1,9 +1,13 @@
+import numpy as np
+import pyaudio
 from PyQt5.QtCore import Qt
-from qfluentwidgets import SingleDirectionScrollArea, TogglePushButton, HeaderCardWidget, FluentIcon, TitleLabel, \
-    ComboBox, SmoothScrollArea, ProgressBar, CardWidget, BodyLabel, ImageLabel, CaptionLabel
-from qfluentwidgets.multimedia.media_play_bar import PlayButton, VolumeButton, FluentStyleSheet
 from PyQt5.QtGui import QImage
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget, QSpacerItem, QSizePolicy
+from qfluentwidgets import TogglePushButton, HeaderCardWidget, FluentIcon, TitleLabel, \
+    ComboBox, SmoothScrollArea, ProgressBar, CardWidget, BodyLabel, ImageLabel, CaptionLabel
+from qfluentwidgets.multimedia.media_play_bar import PlayButton, VolumeButton, FluentStyleSheet
+
+from util import streamout
 
 
 class TestInterface(SmoothScrollArea):
@@ -97,9 +101,13 @@ class TestInterface(SmoothScrollArea):
         class SoundVisualizer(CardWidget):
             def __init__(self, parent=None):
                 super().__init__(parent)
-                self.player = None  # type: MediaPlayerBase
-
+                self.player = streamout # type: pyaudio.Stream
                 self.playButton = PlayButton(self)
+                self.isPlaying = False
+                def toggle_playButton():
+                    self.isPlaying = not self.isPlaying
+                    self.playButton.setPlay(self.isPlaying)
+                self.playButton.clicked.connect(toggle_playButton)
                 self.volumeButton = VolumeButton(self)
                 self.volumeButton.volumeView.volumeLabel.hide()
                 self.progressSlider = ProgressBar(self)
@@ -161,10 +169,20 @@ class TestInterface(SmoothScrollArea):
 
         self.setWidget(self.body)
 
-    def set_preview(self, img):
-        '''
+
+    def set_preview(self, img: QImage):
+        """
         :param img: QImage
-        '''
+        """
         if isinstance(img, QImage):
             img = img.scaled(640, 360)
         self.previewarea.previewarea.setImage(img)
+
+    def set_voice(self, voice: bytes):
+        if not self.soundpreviewarea.previewarea.isPlaying:
+            return None
+        voice_array = np.frombuffer(voice, dtype=np.int16)
+        volume = self.soundpreviewarea.previewarea.volumeButton.volumeView.volumeSlider.value() / 100
+        voice_array = (voice_array * volume).astype(np.int16)
+        self.soundpreviewarea.previewarea.player.write(voice_array.tobytes())
+
