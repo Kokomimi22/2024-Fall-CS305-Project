@@ -28,7 +28,10 @@ class Work(QThread):
             elif isinstance(self.currentVideoSource, Desktop):
                 img = capture_screen().toqimage()  # return QImage
             elif isinstance(self.currentVideoSource, QCameraInfo):
-                img = qcapture_camera(QCamera(self.currentVideoSource))
+                try:
+                    img = qcapture_camera(QCamera(self.currentVideoSource))
+                except Exception as e:
+                    print(e)
 
             self.trigger.emit(img.copy())
             self.msleep(self.restInterval)
@@ -83,7 +86,7 @@ class VideoPreview:
                 icon = FluentIcon.CAMERA
             else:
                 icon = FluentIcon.VIDEO
-            self.view.selecsrcButton.addItem(a.deviceName, icon)
+            self.view.selecsrcButton.addItem(a.deviceName(), icon)
             self.availableVideoSources[i] = a
 
     def handle_source_change(self, index):
@@ -104,8 +107,10 @@ class VideoPreview:
 # constansts
 class Desktop:
     def __init__(self):
-        self.deviceName = 'Desktop Screen'
-        self.icon = FluentIcon.FULL_SCREEN
+        pass
+
+    def deviceName(self):
+        return 'Desktop Screen'
 
     @staticmethod
     def default():

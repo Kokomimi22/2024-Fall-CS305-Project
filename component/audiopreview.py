@@ -32,7 +32,7 @@ class AudioPreview:
 
 
         # signal connection
-        self.play_control.toggled.connect(self.handle_toggle)
+        self.play_control.clicked.connect(self.handle_toggle)
         self.view.selecsrcButton.clicked.connect(self.update_available_input)
         self.volume_control.volumeChanged.connect(self.handle_volume_change)
 
@@ -41,19 +41,18 @@ class AudioPreview:
 
         self.cur_volume = 50 # volume when output
 
-    def handle_toggle(self, checked):
-        if checked:
-            self.play_control.setIcon(FluentIcon.PAUSE)
+    def handle_toggle(self):
+        self.play_control.setPlay(not self.is_playing)
+        if not self.is_playing:
             self.start_audio()
         else:
-            self.play_control.setIcon(FluentIcon.PLAY)
             self.stop_audio()
 
     def start_audio(self):
         if not self.audio_input:
             return
 
-        self.audio_input.start(self.io_device)
+        self.io_device = self.audio_input.start()
         self.audio_output.start(self.io_device)
         self.io_device.readyRead.connect(self.visualize_audio_data)
         self.is_playing = True
@@ -83,7 +82,6 @@ class AudioPreview:
         if self.audio_input:
             self.audio_input.stop()
             self.audio_output.stop()
-            self.io_device.close()
             self.audio_input.deleteLater()
 
         self.audio_input = self.available_audio_input[index]
@@ -100,6 +98,6 @@ class AudioPreview:
             data = self.io_device.readAll()
             volume = audio_data_to_volume(data)
             scaler = self.cur_volume / 100
-            self.visualizer.setValue(volume * scaler)
+            self.visualizer.setValue(int(volume * scaler))
 
 

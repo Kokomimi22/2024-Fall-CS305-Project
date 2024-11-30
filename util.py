@@ -147,8 +147,7 @@ def qcapture_camera(camera: QCamera):
         raise Exception('Camera is not available')
     elif not camera.isAvailable():
         raise Exception('Camera is not available')
-    elif not camera.status() == QCamera.ActiveStatus:
-        raise Exception('Camera is not active')
+
     else:
         image_capture = QCameraImageCapture(camera)
         image_capture.capture()
@@ -232,8 +231,10 @@ def audio_data_to_volume(data):
     data = np.frombuffer(data, dtype=np.int16)
     # calculate volume
     volume = np.sqrt(np.mean(data ** 2))
+    volume = volume if volume < 100 else 100.0
     int16_max_value = np.iinfo(np.int16).max
-    return int(volume / int16_max_value * 100)
+    return int(volume)
+        
 
 ### UUID module ###
 class UUID:
