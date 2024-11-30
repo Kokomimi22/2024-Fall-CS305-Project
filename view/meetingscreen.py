@@ -1,18 +1,15 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QGridLayout, QScrollArea, QFrame, QSizePolicy, \
-    QApplication, QHBoxLayout
-from PyQt5.QtGui import QFont, QColor, QIcon, QImage, QBrush, QPainter, QPainterPath
+import sys
+
 from PyQt5.QtCore import Qt, QRectF
+from PyQt5.QtGui import QFont, QColor, QIcon, QImage, QPainter, QPainterPath
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QGridLayout, QFrame, QSizePolicy, \
+    QApplication, QHBoxLayout
 from qfluentwidgets import (CardWidget, HeaderCardWidget, SplitTitleBar, isDarkTheme, CommandBar, Action, FluentIcon,
-                            FlyoutViewBase, Slider, ToolTip, CaptionLabel, Flyout, FlyoutAnimationType,
-                            SmoothScrollArea, AvatarWidget, SingleDirectionScrollArea, TextEdit, PrimaryPushButton,
-                            PrimaryToolButton
+                            FlyoutViewBase, Slider, CaptionLabel, Flyout, FlyoutAnimationType,
+                            AvatarWidget, SingleDirectionScrollArea, TextEdit, PrimaryToolButton
                             )
 from qfluentwidgets.components.widgets.card_widget import CardSeparator
-from qframelesswindow import FramelessWindow, AcrylicWindow
 
-from resources import rc
-
-import sys
 
 def isWin11():
     return sys.platform == 'win32' and sys.getwindowsversion().build >= 22000

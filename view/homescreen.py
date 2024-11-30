@@ -1,11 +1,17 @@
 import uuid
 
-from qfluentwidgets import SearchLineEdit, RoundMenu, Action, TitleLabel, SubtitleLabel, ImageLabel, \
-    SingleDirectionScrollArea, FluentIcon
-from PyQt5.QtWidgets import QSpacerItem, QSizePolicy, QWidget, QVBoxLayout, QPushButton, QGraphicsDropShadowEffect, \
-    QFrame, QHBoxLayout
-from PyQt5.QtGui import QPainter, QPainterPath, QLinearGradient, QBrush, QImage, QIcon, QColor, QDesktopServices
 from PyQt5.QtCore import QRectF, Qt, QSize, QUrl
+from PyQt5.QtGui import QPainter, QPainterPath, QLinearGradient, QBrush, QImage, QIcon, QDesktopServices
+from PyQt5.QtWidgets import QSpacerItem, QSizePolicy, QWidget, QVBoxLayout, QPushButton, QHBoxLayout
+from qfluentwidgets import SearchLineEdit, TitleLabel, SubtitleLabel, SingleDirectionScrollArea, FluentIcon
+
+homeController = None
+
+
+def setHomeController(controller):
+    from app import HomeController
+    global homeController  # type: HomeController
+    homeController = controller
 
 
 class BannerWidget(QWidget):
@@ -18,7 +24,6 @@ class BannerWidget(QWidget):
         self.title = TitleLabel('Online meeting room', self)
         self.starterLabel = SubtitleLabel('Start your first meeting', self)
         self.banner = QImage(':/images/header.png')
-
 
         self.createButton = CreateButton(self)
 
@@ -45,9 +50,9 @@ class BannerWidget(QWidget):
         path.setFillRule(Qt.WindingFill)
         w, h = self.width(), 241
         path.addRoundedRect(QRectF(0, 0, w, h), 10, 10)
-        path.addRect(QRectF(0, h-50, 50, 50))
-        path.addRect(QRectF(w-50, 0, 50, 50))
-        path.addRect(QRectF(w-50, h-50, 50, 50))
+        path.addRect(QRectF(0, h - 50, 50, 50))
+        path.addRect(QRectF(w - 50, 0, 50, 50))
+        path.addRect(QRectF(w - 50, h - 50, 50, 50))
         path = path.simplified()
 
         gradient = QLinearGradient(0, 0, 0, self.height())
@@ -58,13 +63,12 @@ class BannerWidget(QWidget):
         # painter.fillPath(path, QBrush(gradient))
 
         qimage = self.banner.scaled(
-           QSize(w, h), transformMode=Qt.SmoothTransformation)
+            QSize(w, h), transformMode=Qt.SmoothTransformation)
 
         painter.fillPath(path, QBrush(qimage))
 
+
 class CreateButton(QPushButton):
-
-
     CREATE_ICON_PATH = ':/images/create.png'
 
     def __init__(self, parent=None):
@@ -93,7 +97,7 @@ class CreateButton(QPushButton):
         self.setGraphicsEffect(shadow)
 
 
-from qfluentwidgets import BodyLabel, CaptionLabel, ImageLabel, AvatarWidget, MessageBox
+from qfluentwidgets import ImageLabel, AvatarWidget, MessageBox
 from PyQt5.QtGui import QColor, QFont
 from PyQt5.QtWidgets import QLabel, QPushButton, QFrame, QGraphicsDropShadowEffect
 
@@ -257,17 +261,14 @@ class ConferenceCard(QFrame):
         w.cancelButton.setText('Cancel')
 
         if w.exec():
-            QDesktopServices.openUrl(QUrl("https://www.google.com"))
-
+            homeController.switch_to_meeting_screen()
 
 
 class HomeInterface(QFrame):
-
     ONLINE_ICON_PATH = ':/images/online.png'
 
     def __init__(self, parent=None):
         super().__init__(parent)
-
         self.setObjectName('Home-Interface')
         self.body = QVBoxLayout(self)
         self.body.setContentsMargins(0, 0, 0, 0)

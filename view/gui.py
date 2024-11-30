@@ -1,16 +1,10 @@
-from qfluentwidgets import FluentTranslator, SplashScreen, ImageLabel
-
 from PyQt5.QtCore import QEventLoop, QTimer, pyqtSignal, QSize, Qt
-
-from view.loginscreen import LoginWindow
+from qfluentwidgets import FluentTranslator, SplashScreen
 
 from view.homescreen import HomeInterface
-from view.testscreen import TestInterface
+from view.loginscreen import LoginWindow
 from view.navigationavatarwidget import NavigationAvatarWidget
-
-from util import *
-
-from resources import rc
+from view.testscreen import TestInterface
 
 
 class LoginWindow(LoginWindow):
@@ -45,10 +39,10 @@ class LoginWindow(LoginWindow):
 # Main window
 import sys
 
-from PyQt5.QtCore import QUrl, QLocale
-from PyQt5.QtGui import QIcon, QDesktopServices
+from PyQt5.QtCore import QLocale
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QFrame, QHBoxLayout
-from qfluentwidgets import (NavigationItemPosition, MessageBox, FluentWindow,
+from qfluentwidgets import (NavigationItemPosition, FluentWindow,
                             NavigationAvatarWidget, SubtitleLabel, setFont)
 from qfluentwidgets import FluentIcon as FIF
 
