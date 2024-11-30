@@ -1,3 +1,5 @@
+from component.audiopreview import AudioPreview
+from component.videopreview import VideoPreview
 from view.gui import Main
 from view.gui import LoginWindow
 from view.gui import TestInterface
@@ -22,6 +24,9 @@ class AppController:
         self.mainui.close_signal.connect(self.stop)
         # initial other controller
 
+        # test
+        self.switch_ui('main')
+
     def switch_ui(self, to='main'):
         if to == 'main':
             self.mainui.show()
@@ -34,11 +39,9 @@ class AppController:
 
     def start(self):
         self.logincontol.register_all_action()
-        self.testcontrol.register_all_action()
         pass
 
     def stop(self):
-        self.testcontrol.stop_thread()
         self.logincontol.stop_thread()
         QApplication.quit()
 
@@ -100,57 +103,13 @@ class LoginController:
     def stop_thread(self):
         pass
 
-
-class Work(QThread):
-    trigger = pyqtSignal(QImage)
-
-    def __init__(self):
-        super(Work, self).__init__()
-
-    def run(self):
-        while not self.isInterruptionRequested():
-            screen = capture_screen()
-            qimage = screen.toqimage()
-            qimage = qimage.scaled(640, 360, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.trigger.emit(qimage)
-            self.msleep(16)  # approximately 60fps
-
-    def stop(self):
-        self.requestInterruption()
-        self.wait()
-
-
 class TestController:
 
     def __init__(self, testui: TestInterface, app: AppController):
         self.interface = testui
-        self.is_preview = False
-        self.preview_thread = Work()
-        self.preview_thread.trigger.connect(self.update_preview)
         self.app = app
-
-    def register_all_action(self):
-        self.interface.previewarea.previewstartbutton.toggled.connect(self.toggle_preview)
-
-    def toggle_preview(self):
-        self.is_preview = not self.is_preview
-
-        if not self.is_preview:
-            self.preview_thread.stop()
-            # self.interface.previewarea.setImage(default)
-
-        if self.is_preview:
-            self.preview_thread.start()
-
-    def update_preview(self, qimage: QImage):
-        self.interface.set_preview(qimage)
-        print('finish update preview')
-
-    def stop_thread(self):
-        if self.preview_thread and self.preview_thread.isRunning():
-            self.preview_thread.stop()
-        self.preview_thread = None
-
+        self.video_preview = VideoPreview(self.interface.previewarea)
+        self.audio_preview = AudioPreview(self.interface.soundpreviewarea)
 
 from PyQt5.QtCore import Qt, QLocale
 from PyQt5.QtWidgets import QApplication

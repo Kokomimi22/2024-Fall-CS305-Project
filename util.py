@@ -9,6 +9,9 @@ import cv2
 import pyautogui
 import numpy as np
 from PIL import Image, ImageGrab
+from PyQt5.QtMultimedia import QCameraInfo, QAudioDeviceInfo, QAudio, QCamera, QCameraImageCapture, QAudioInput, \
+    QAudioFormat
+
 from config import *
 import time
 import json
@@ -16,9 +19,18 @@ import uuid
 
 # audio setting
 FORMAT = pyaudio.paInt16
+QAUDIO_FORMAT = QAudioFormat()
+QAUDIO_FORMAT.setSampleRate(RATE)
+QAUDIO_FORMAT.setChannelCount(CHANNELS)
+QAUDIO_FORMAT.setSampleSize(SAMPLE_SIZE)
+QAUDIO_FORMAT.setCodec(CODE_C)
+QAUDIO_FORMAT.setByteOrder(QAudioFormat.LittleEndian)
+QAUDIO_FORMAT.setSampleType(QAudioFormat.SignedInt)
+
 audio = pyaudio.PyAudio()
-# streamin = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
-# streamout = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=CHUNK)
+if audio.get_device_count() == 0: # TODO: remove this in later version
+    streamin = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
+    streamout = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=CHUNK)
 
 # print warning if no available camera
 cap = cv2.VideoCapture(0)
@@ -117,9 +129,35 @@ def capture_camera():
         raise Exception('Fail to capture frame from camera')
     return Image.fromarray(frame)
 
+def qcapture_audio(audioinput: QAudioInput):
+    # capture frame of camera
+    if audioinput is None:
+        raise Exception('Audio is not available')
+    elif not audioinput.isAvailable():
+        raise Exception('Audio is not available')
+    elif not audioinput.status() == QAudio.ActiveStatus:
+        raise Exception('Audio is not active')
+    else:
+        pass
+    raise NotImplementedError('qcapture_audio is not implemented yet')
+
+def qcapture_camera(camera: QCamera):
+    # capture frame of camera
+    if camera is None:
+        raise Exception('Camera is not available')
+    elif not camera.isAvailable():
+        raise Exception('Camera is not available')
+    elif not camera.status() == QCamera.ActiveStatus:
+        raise Exception('Camera is not active')
+    else:
+        image_capture = QCameraImageCapture(camera)
+        image_capture.capture()
+        image = image_capture.image()
+        return image
+
 
 def capture_voice():
-    return streamin.read(CHUNK)
+    raise RuntimeError("This method can't be called currently")
 
 
 def compress_image(image, format='JPEG', quality=85):
@@ -149,6 +187,54 @@ def decompress_image(image_bytes):
 
     return image
 
+def getVideoDevices():
+    """
+    get all video devices
+    :return: list, list of video devices
+    """
+    return QCameraInfo.availableCameras()
+
+def getAudioOutputDevices():
+    """
+    get all audio devices
+    :return: list, list of audio devices
+    """
+    devices = []
+    device_name = []
+    for device in QAudioDeviceInfo.availableDevices(QAudio.AudioOutput):
+        if device.deviceName() not in device_name:
+            devices.append(device)
+            device_name.append(device.deviceName())
+    return devices
+
+def getAudioInputDevices():
+    """
+    get all audio devices
+    :return: list, list of audio devices
+    """
+    devices = []
+    device_name = []
+    for device in QAudioDeviceInfo.availableDevices(QAudio.AudioInput):
+        if device.deviceName() not in device_name:
+            devices.append(device)
+            device_name.append(device.deviceName())
+    return devices
+
+def audio_data_to_volume(data):
+    """
+    convert audio data to volume
+    :param data: bytes, audio data
+    :return: int, volume [0, 100]
+    """
+    # convert bytes to numpy array
+    if not data:
+        return 0
+    data = np.frombuffer(data, dtype=np.int16)
+    # calculate volume
+    volume = np.sqrt(np.mean(data ** 2))
+    int16_max_value = np.iinfo(np.int16).max
+    return int(volume / int16_max_value * 100)
+
 ### UUID module ###
 class UUID:
 
@@ -162,7 +248,7 @@ class UUID:
 
     def generate_uuid(self, length=UUID_SIZE):
         """
-        generate a uuid in hex
+        generate an uuid in hex
         :param length: int, length of uuid in hex
         :return: str, uuid in hex
         """
@@ -180,7 +266,7 @@ class UUID:
 
     def remove_uuid(self, uuid_hex):
         """
-        remove a uuid from the list
+        remove an uuid from the list
         :param uuid_hex: str, uuid in hex
         """
         if uuid_hex in self.uuids:
@@ -195,3 +281,7 @@ class UUID:
         """
         return self.uuids
 
+for device in getAudioOutputDevices():
+    print(device.deviceName())
+for device in getVideoDevices():
+    print(device.deviceName())
