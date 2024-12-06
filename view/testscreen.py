@@ -9,7 +9,6 @@ from qfluentwidgets.multimedia.media_play_bar import PlayButton, VolumeButton, F
 
 from util import streamout
 
-
 class TestInterface(SmoothScrollArea):
     class VideoPreviewCard(HeaderCardWidget):
 
@@ -19,6 +18,7 @@ class TestInterface(SmoothScrollArea):
             super().__init__(parent)
             self.setObjectName('Video-Preview-Card')
             self.setTitle('Video Preview')
+
             self.mainLayout = QVBoxLayout()
             self.mainLayout.setSpacing(10)
 
@@ -52,6 +52,22 @@ class TestInterface(SmoothScrollArea):
             self.mainLayout.addLayout(self.topLayout)
             self.mainLayout.addLayout(self.bottomLayout)
             self.viewLayout.addLayout(self.mainLayout)
+
+        def set_preview(self, img):
+            '''
+            :param img: QImage
+            '''
+            if isinstance(img, QImage):
+                img = img.scaled(640, 360, Qt.KeepAspectRatio | Qt.SmoothTransformation)
+            self.previewarea.setImage(img)
+
+        def addVideoSource(self, src, is_screen=False):
+            """
+            :param src: str, device name
+            :param is_screen: bool, if this source is screen
+            """
+            icon = FluentIcon.FULL_SCREEN if is_screen else FluentIcon.CAMERA
+            self.selecsrcButton.addItem(src, icon)
 
         def handle_toggle(self, checked):
             if checked:
