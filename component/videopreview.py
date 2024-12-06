@@ -1,14 +1,13 @@
 # controller for video preview card widget
 
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtProperty, pyqtSlot
+from math import ceil
+
+from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtGui import QImage
 from qfluentwidgets import FluentIcon
 
-from view.testscreen import TestInterface
-
-from math import ceil
-
 from util import *
+from view.testscreen import TestInterface
 
 VideoPreviewCardView = TestInterface.VideoPreviewCard
 

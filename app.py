@@ -1,15 +1,11 @@
+import sys
+
+from common.conf_client import ConferenceClient
 from component.audiopreview import AudioPreview
 from component.videopreview import VideoPreview
-from view.gui import Main
 from view.gui import LoginWindow
+from view.gui import Main
 from view.gui import TestInterface
-
-from PyQt5.QtCore import QThread, pyqtSignal
-from PyQt5.QtGui import QImage
-
-from util import *
-from common.conf_client import ConferenceClient
-import sys
 
 conf_client = None
 
