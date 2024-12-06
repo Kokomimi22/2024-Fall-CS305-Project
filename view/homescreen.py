@@ -5,15 +5,6 @@ from PyQt5.QtGui import QPainter, QPainterPath, QLinearGradient, QBrush, QImage,
 from PyQt5.QtWidgets import QSpacerItem, QSizePolicy, QWidget, QVBoxLayout, QPushButton, QHBoxLayout
 from qfluentwidgets import SearchLineEdit, TitleLabel, SubtitleLabel, SingleDirectionScrollArea, FluentIcon
 
-homeController = None
-
-
-def setHomeController(controller):
-    from app import HomeController
-    global homeController  # type: HomeController
-    homeController = controller
-
-
 class BannerWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -261,7 +252,7 @@ class ConferenceCard(QFrame):
         w.cancelButton.setText('Cancel')
 
         if w.exec():
-            homeController.switch_to_meeting_screen()
+            QDesktopServices.openUrl(QUrl('https://github.com'))
 
 
 class HomeInterface(QFrame):
