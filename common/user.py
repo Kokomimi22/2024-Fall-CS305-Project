@@ -2,10 +2,10 @@ from config import *
 from util import *
 
 class User:
-    def __init__(self, uuid, username='default', password='password'):
+    def __init__(self, uuid: str, username='default', password='password'):
         self.username = username
         self.password = password
-        self.uuid = uuid
+        self.uuid: str = uuid
         self.addr = None  # (ip, port)
         self.is_active = False # is user online
 

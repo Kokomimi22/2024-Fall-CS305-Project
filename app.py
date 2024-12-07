@@ -1,3 +1,6 @@
+import sys
+
+from common.conf_client import ConferenceClient
 from component.audiopreview import AudioPreview
 from component.meetingcreate import MeetingCreate
 from component.videopreview import VideoPreview

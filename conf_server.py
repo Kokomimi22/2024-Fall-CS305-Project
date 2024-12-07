@@ -1,25 +1,30 @@
+import json
 import random
+import socket
 import threading
+from codecs import StreamWriter, StreamReader
+from http.client import responses
 
 from common.user import *
 
 import asyncio
 
+
 class ConferenceServer:
-    def __init__(self, manager, conference_id, conf_serve_ports):
-        #the ip address of the manager
-        self.manager = manager #str(uuid)
-        self.conference_id = conference_id
-        self.conf_serve_ports = conf_serve_ports
+    def __init__(self, manager_id: str, conference_id: int, conf_serve_port: int):
+        # the ip address of the manager
+        self.manager_id: str = manager_id  # str(uuid)
+        self.conference_id: int = conference_id
+        self.conf_serve_port: int = conf_serve_port
         self.data_serve_ports = {}
-        self.data_types = ['screen', 'camera', 'audio']
+        self.data_types: List[str] = ['screen', 'camera', 'audio']
         self.clients_info = []
         self.client_conns = {}
         self.mode = 'Client-Server'
         self.running = True
         self.loop = asyncio.new_event_loop()
 
-    async def handle_data(self, reader, writer, data_type):
+    async def handle_data(self, reader: StreamReader, writer: StreamWriter, data_type):
         """
         Receive sharing stream data from a client and forward it to the rest of the clients.
         """
@@ -32,14 +37,14 @@ class ConferenceServer:
                     client_writer.write(data)
                     await client_writer.drain()
 
-    async def handle_client(self, reader, writer):
+    async def handle_client(self, reader: StreamReader, writer: StreamWriter):
         """
         Handle in-meeting requests or messages from clients.
         """
         addr = writer.get_extra_info('peername')
         self.clients_info.append(addr)
         self.client_conns[addr] = (reader, writer)
-        user_uuid = None
+        client_id = None
         try:
             while self.running:
                 data = await reader.read(CONTROL_LINE_BUFFER)
@@ -47,18 +52,11 @@ class ConferenceServer:
                     break
                 message = data.decode()
                 print(f"Received: {message} from {addr}")
-                fields = data.decode().split(' ')
-                if fields[0] == 'share':
-                    data_type = fields[1]
-                    await self.handle_data(reader, writer, data_type)
-                elif fields[0] == 'init':
-                    user_uuid = fields[1]
-                    writer.write(f"Welcome to conference {self.conference_id}".encode())
-                    await writer.drain()
-                elif fields[0] == 'quit':
-                    print(f"Client {addr} has requested to quit the conference.")
-                    writer.write(b'Quitted')
+                request = json.loads(message)
+                if request['type'] == MessageType.QUIT.value:
                     break
+                elif request['type'] == MessageType.INIT.value:
+                    client_id = request['client_id']
                 else:
                     print(f"Unknown message: {message}")
         except asyncio.CancelledError:
@@ -75,12 +73,11 @@ class ConferenceServer:
                     print(f"Failed to send 'Cancelled' message to {addr} because the connection was closed.")
                 writer.close()
                 try:
-                    await asyncio.wait_for(writer.wait_closed(), timeout=5)  # set a timeout to wait for the writer to close
+                    await asyncio.wait_for(writer.wait_closed(), timeout=5)
                 except asyncio.TimeoutError:
                     print(f"Waiting for {addr} to close timed out.")
                 print(f"Client {addr} has left the conference.")
-            # judge if the manager has left the conference
-            if user_uuid == self.manager and self.running:
+            if self.running and client_id == self.manager_id:
                 await self.stop()
 
     async def log(self):
@@ -90,6 +87,7 @@ class ConferenceServer:
                 await asyncio.sleep(5)
         except asyncio.CancelledError:
             pass
+
     async def stop(self):
         self.running = False
         await self.cancel_conference()
@@ -100,19 +98,19 @@ class ConferenceServer:
         Disconnect all connections to cancel the conference.
         """
         print(f"Attempting to cancel conference {self.conference_id}...")
-        # cancel all tasks
-        cancel_success = [task.cancel() for task in asyncio.all_tasks(self.loop) if task is not asyncio.current_task()]
-        if all(cancel_success):
-            print(f"Conference {self.conference_id} successfully cancelled.")
-        else:
-            print(f"Failed to cancel conference {self.conference_id}.")
-        #self.loop.stop()
+        # Cancel all tasks
+        tasks = [task for task in asyncio.all_tasks(self.loop) if task is not asyncio.current_task()]
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        print(f"Conference {self.conference_id} successfully cancelled.")
+        # self.loop.stop()
 
     def start(self):
         """
         Start the ConferenceServer and necessary running tasks to handle clients in this conference.
         """
-        server_coro = asyncio.start_server(self.handle_client, '127.0.0.1', self.conf_serve_ports)
+        server_coro = asyncio.start_server(self.handle_client, '127.0.0.1', self.conf_serve_port)
         server = self.loop.run_until_complete(server_coro)
         self.loop.create_task(self.log())
         try:
@@ -131,6 +129,7 @@ class ConferenceServer:
                     self.loop.run_until_complete(self.cancel_conference())
                 self.loop.close()
 
+
 class MainServer:
     def __init__(self, server_ip, main_port):
         # async server
@@ -142,56 +141,71 @@ class MainServer:
         self.conference_servers = {}  # self.conference_servers[conference_id] = ConferenceManager
         self.user_manager = UserManager()
 
-    def handle_create_conference(self, uuid):
+    @staticmethod
+    def _get_port() -> int:
+        sock = socket.socket()
+        sock.bind(('', 0))
+        port = sock.getsockname()[1]
+        sock.close()
+        return port
+
+    def handle_create_conference(self, client_id: str) -> Dict[str, Any]:
         """
         create conference: create and start the corresponding ConferenceServer, and reply necessary info to client
         """
-        # Generate a unique conference_id
+        # 生成唯一的会议id
         conference_id = random.randint(1000, 9999)
         while conference_id in self.conference_servers:
             conference_id = random.randint(1000, 9999)
 
-        # Generate a unique conference_port
-        conference_port = random.randint(10000, 65535)
-        existing_ports = [server.conf_serve_ports for server in self.conference_servers.values()]
-        while conference_port in existing_ports:
-            conference_port = random.randint(10000, 65535)
-
-        # Create and store the new ConferenceServer
-        conference_server = ConferenceServer(uuid, conference_id, conference_port)
+        # 会议服务器的端口号
+        conference_port = self._get_port()
+        conference_server = ConferenceServer(client_id, conference_id, conference_port)
+        # 为会议服务器的每个数据服务器生成端口号
+        for dataType in conference_server.data_types:
+            conference_server.data_serve_ports[dataType] = self._get_port()
         self.conference_servers[conference_id] = conference_server
-        # Start the conference server in a new thread
+        # 启动会议服务器
         conference_thread = threading.Thread(target=conference_server.start)
         conference_thread.start()
-        print(f"Created conference {conference_id} with ports {conference_port}")
-        return f"Created {conference_id}"
-        
-    def handle_join_conference(self, conference_id):
+        print(f"Created conference {conference_id} with port {conference_port}")
+        return {
+            'status': Status.SUCCESS.value,
+            'conference_id': conference_id,
+        }
+
+    def handle_join_conference(self, conference_id: int) -> Dict[str, Any]:
         """
         join conference: search corresponding conference_info and ConferenceServer, and reply necessary info to client
         """
         if conference_id in self.conference_servers.keys():
-            response = f"Joined conference {conference_id} with ports {self.conference_servers[conference_id].conf_serve_ports}"
-        else:
-            response = f"Conference {conference_id} not found"
-        return response
+            conference_server = self.conference_servers[conference_id]
+            return {
+                'status': Status.SUCCESS.value,
+                'conference_id': conference_id,
+                'data_serve_ports': conference_server.data_serve_ports,
+                'conference_serve_port': conference_server.conf_serve_port
+            }
 
-    def handle_quit_conference(self):
-        """
-        quit conference (in-meeting request & or no need to request)
-        """
-        pass
+        return {
+            'status': Status.FAILED.value,
+            'message': f"Conference {conference_id} not found"
+        }
+
     def handle_register(self, username, password):
         """
         register a new user
         """
         # 生成一个唯一的uuid，储存到json文件中
-        # TODO: 或许回来可以做一些数据库，使用jwt来进行用户认证等等，目前只是简单的存储到json文件中
         _new_user = self.user_manager.register(username, password)
         if _new_user:
-            uuid = _new_user.uuid
-            return f"Registered {username} with uuid {uuid}"
-        return "Registration failed"
+            return {
+                'status': Status.SUCCESS.value,
+            }
+        return {
+            'status': Status.FAILED.value,
+            'message': 'Register Failed'
+        }
 
     def handle_login(self, username, password):
         """
@@ -201,66 +215,80 @@ class MainServer:
         _user = self.user_manager.login(username, password)
         if _user:
             uuid = _user.uuid
-            return f"Logged in {username} with uuid {uuid}"
-        return "Login failed"
+            return {
+                'status': Status.SUCCESS.value,
+                'uuid': uuid
+            }
+        return {
+            'status': Status.FAILED.value,
+            'message': 'Username or password are incorrect'
+        }
 
     def handle_logout(self, uuid):
         """
         logout an existing user
         """
         # 读取json文件，查找是否有对应的uuid
-        self.user_manager.logout(uuid)
-        return f"Logged out {uuid}"
+        _user = self.user_manager.logout(uuid)
+        if _user:
+            return {
+                'status': Status.SUCCESS.value,
+            }
+        return {
+            'status': Status.FAILED.value,
+            'message': 'User not found'
+        }
 
-    def handle_cancel_conference(self, conference_id, uuid=None):
+    def handle_cancel_conference(self, conference_id, client_id=None):
         """
         cancel conference (in-meeting request, a ConferenceServer should be closed by the MainServer)
         """
         if conference_id in self.conference_servers:
-            manager_uuid = self.conference_servers[conference_id].manager
-            if uuid != manager_uuid:
-                return "You are not the manager of this conference"
+            manager_uuid = self.conference_servers[conference_id].manager_id
+            if client_id != manager_uuid:
+                return {
+                    'status': Status.FAILED.value,
+                    'message': 'You are not the manager of this conference'
+                }
             conference_server = self.conference_servers[conference_id]
             asyncio.run_coroutine_threadsafe(conference_server.stop(), conference_server.loop)
             del self.conference_servers[conference_id]
-            response = f"Cancelled conference {conference_id}"
-        else:
-            response = f"Conference {conference_id} not found"
-        return response
+            return {
+                'status': Status.SUCCESS.value
+            }
+        return {
+            'status': Status.FAILED.value,
+            'message': f"Conference {conference_id} not found"
+        }
+
     async def request_handler(self, reader, writer):
         data = await reader.read(CONTROL_LINE_BUFFER)
         message = data.decode().strip()
-        addr = writer.get_extra_info('peername')
 
-        print(f"Received: {message} from {addr}")
-        fields = message.split(' ')
+        print(f"Received: {message} from {writer.get_extra_info('peername')}")
+        fields: Dict[str, Any] = json.loads(message)
 
-
-        if len(fields) == 2:
-            if fields[0] == 'join':
-                response = self.handle_join_conference(conference_id=int(fields[1]))
-            elif fields[0] == 'logout':
-                response = self.handle_logout(uuid=fields[1])
-            else:
-                response = "Unknown command"
-        elif len(fields) == 3:
-            if fields[0] == 'register':
-                response = self.handle_register(fields[1], fields[2])
-            elif fields[0] == 'login':
-                response = self.handle_login(fields[1], fields[2])
-            elif fields[0] == 'create':
-               response = self.handle_create_conference(uuid=fields[-1])
-            else:
-                response = "Unknown command"
-        elif len(fields) == 4:
-            if fields[0] == 'cancel':
-                response = self.handle_cancel_conference(conference_id=int(fields[1]), uuid=fields[-1])
-            else:
-                response = "Unknown command"
+        client_id = fields.get('client_id')
+        conference_id = fields.get('conference_id')
+        message_type: str = fields['type']
+        if message_type == MessageType.JOIN.value:
+            response = self.handle_join_conference(conference_id)
+        elif message_type == MessageType.LOGOUT.value:
+            response = self.handle_logout(client_id)
+        elif message_type == MessageType.REGISTER.value:
+            response = self.handle_register(fields.get('username'), fields.get('password'))
+        elif message_type == MessageType.LOGIN.value:
+            response = self.handle_login(fields.get('username'), fields.get('password'))
+        elif message_type == MessageType.CREATE.value:
+            response = self.handle_create_conference(client_id)
+        elif message_type == MessageType.CANCEL.value:
+            response = self.handle_cancel_conference(conference_id, client_id)
         else:
-            response = "Unknown command"
-
-        writer.write(response.encode())
+            response = {
+                'status': Status.FAILED.value,
+                'message': 'Unknown command'
+            }
+        writer.write(json.dumps(response).encode())
         await writer.drain()
 
         writer.close()

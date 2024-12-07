@@ -115,7 +115,6 @@ class Main(FluentWindow):
     def closeEvent(self, event):
         self.close_signal.emit()
         event.accept()
-
 def show():
     # enable dpi scale
     QApplication.setHighDpiScaleFactorRoundingPolicy(

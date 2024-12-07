@@ -1,3 +1,5 @@
+from enum import Enum
+from typing import *
 HELP = 'Create         : create an conference\n' \
        'Join [conf_id ]: join a conference with conference ID\n' \
        'Quit           : quit an on-going conference\n' \
@@ -11,7 +13,7 @@ LOG_INTERVAL = 2
 CONTROL_LINE_BUFFER = 1024
 DATA_LINE_BUFFER = 4096
 USER_INFO_FILE = 'user_info.json'
-CHUNK = 1024
+CHUNK = 4096  # Audio chunk size
 CHANNELS = 1  # Channels for audio capture
 RATE = 44100  # Sampling rate for audio capture
 SAMPLE_SIZE = 16  # Sample size for audio capture
@@ -19,3 +21,16 @@ CODE_C = 'audio/pcm'  # Codec for audio capture
 SUCCESSFUL = True
 FAILED = False
 camera_width, camera_height = 480, 480  # resolution for camera capture
+VIDEO_CHUNK_SIZE = 4096
+class MessageType(Enum):
+       LOGIN = 'login'
+       LOGOUT = 'logout'
+       CREATE = 'create_conference'
+       JOIN = 'join_conference'
+       QUIT = 'quit_conference'
+       CANCEL = 'cancel_conference'
+       REGISTER = 'register'
+       INIT = 'init_conference'
+class Status(Enum):
+       SUCCESS = True
+       FAILED = False
