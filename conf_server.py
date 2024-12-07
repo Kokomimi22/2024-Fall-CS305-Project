@@ -57,6 +57,9 @@ class ConferenceServer:
                     break
                 elif request['type'] == MessageType.INIT.value:
                     client_id = request['client_id']
+                elif request['type'] == MessageType.TEXT_MESSAGE.value:
+                    sender_name = request.get('sender_name', 'undefined')
+                    await self.emit_message(request['message'], sender_name, writer)
                 else:
                     print(f"Unknown message: {message}")
         except asyncio.CancelledError:
@@ -79,6 +82,21 @@ class ConferenceServer:
                 print(f"Client {addr} has left the conference.")
             if self.running and client_id == self.manager_id:
                 await self.stop()
+
+    async def emit_message(self, message: str, sender_name: str, sender: StreamWriter):
+        """
+        Send a message to all clients in the conference.
+        """
+        emit_message = {
+            'type': MessageType.TEXT_MESSAGE.value,
+            'message': message,
+            'sender_name': sender_name
+        }
+        for client_reader, client_writer in self.client_conns.values():
+            if client_writer != sender:
+                client_writer.write(json.dumps(emit_message).encode())
+                await client_writer.drain()
+
 
     async def log(self):
         try:
@@ -148,6 +166,15 @@ class MainServer:
         port = sock.getsockname()[1]
         sock.close()
         return port
+
+    def handle_get_conferences(self):
+        """
+        get all conferences
+        """
+        return {
+            'status': Status.SUCCESS.value,
+            'conferences': list(self.conference_servers.keys())
+        }
 
     def handle_create_conference(self, client_id: str) -> Dict[str, Any]:
         """

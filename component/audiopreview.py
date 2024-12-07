@@ -30,14 +30,12 @@ class AudioPreview:
 
         self.available_audio_input = {} # {sourceIndex: source}
 
-
         # signal connection
         self.play_control.clicked.connect(self.handle_toggle)
         self.view.selecsrcButton.clicked.connect(self.update_available_input)
         self.volume_control.volumeChanged.connect(self.handle_volume_change)
 
         self.play_control.setDisabled(True) # disable play button until audio input is selected
-
 
         self.cur_volume = 50 # volume when output
 
@@ -99,5 +97,7 @@ class AudioPreview:
             volume = audio_data_to_volume(data)
             scaler = self.cur_volume / 100
             self.visualizer.setValue(int(volume * scaler))
+
+
 
 

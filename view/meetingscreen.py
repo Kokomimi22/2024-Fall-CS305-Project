@@ -188,8 +188,8 @@ class FullCommandBar(CommandBar):
         self.addSeparator()
 
         self.addActions([
-            Action(FluentIcon.DELETE, 'Leave', triggered=self.leave),
-            Action(FluentIcon.CLOSE, 'Cancel', triggered=self.end)
+            Action(FluentIcon.RETURN, 'Leave', triggered=self.leave),
+            Action(FluentIcon.DELETE, 'Cancel', triggered=self.end)
         ])
 
         self.resizeToSuitableWidth()

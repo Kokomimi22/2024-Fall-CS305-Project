@@ -1,10 +1,14 @@
+from qfluentwidgets import FluentTranslator, SplashScreen, ImageLabel
+
 from PyQt5.QtCore import QEventLoop, QTimer, pyqtSignal, QSize, Qt
-from qfluentwidgets import FluentTranslator, SplashScreen
+
+from view.loginscreen import LoginWindow
 
 from view.homescreen import HomeInterface
-from view.loginscreen import LoginWindow
-from view.navigationavatarwidget import NavigationAvatarWidget
 from view.testscreen import TestInterface
+from view.clickednavigationavatarwidget import ClickedNavigationAvatarWidget
+
+from resources import rc
 
 
 class LoginWindow(LoginWindow):
@@ -39,10 +43,10 @@ class LoginWindow(LoginWindow):
 # Main window
 import sys
 
-from PyQt5.QtCore import QLocale
-from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import QUrl, QLocale
+from PyQt5.QtGui import QIcon, QDesktopServices
 from PyQt5.QtWidgets import QApplication, QFrame, QHBoxLayout
-from qfluentwidgets import (NavigationItemPosition, FluentWindow,
+from qfluentwidgets import (NavigationItemPosition, MessageBox, FluentWindow,
                             NavigationAvatarWidget, SubtitleLabel, setFont)
 from qfluentwidgets import FluentIcon as FIF
 
@@ -61,7 +65,9 @@ class Widget(QFrame):
 
 
 class Main(FluentWindow):
+
     close_signal = pyqtSignal()
+
     def __init__(self):
         super().__init__()
         # create sub interface
@@ -81,7 +87,7 @@ class Main(FluentWindow):
         # add custom widget to bottom
         self.navigationInterface.addWidget(
             routeKey='avatar',
-            widget=NavigationAvatarWidget('zhiyiYo', 'resources/shoko.png'),
+            widget=ClickedNavigationAvatarWidget('zhiyiYo', 'resources/shoko.png'),
             onClick=None,
             position=NavigationItemPosition.BOTTOM,
         )

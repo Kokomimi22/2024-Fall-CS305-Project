@@ -3,13 +3,14 @@ from PyQt5.QtWidgets import QWidget
 from qfluentwidgets import NavigationAvatarWidget, AvatarWidget, BodyLabel, CaptionLabel, RoundMenu, FluentIcon, Action
 
 
-class NavigationAvatarWidget(NavigationAvatarWidget):
+class ClickedNavigationAvatarWidget(NavigationAvatarWidget):
     '''
     override the click event
     '''
 
     def __init__(self, name: str, avatarPath: str, parent=None):
         super().__init__(name, avatarPath, parent)
+        self.menu = None
 
     def mousePressEvent(self, e):
         super().mousePressEvent(e)

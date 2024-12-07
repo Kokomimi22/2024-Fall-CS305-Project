@@ -2,23 +2,40 @@ import sys
 
 from common.conf_client import ConferenceClient
 from component.audiopreview import AudioPreview
+from component.meetingcreate import MeetingCreate
 from component.videopreview import VideoPreview
-from view.gui import LoginWindow
 from view.gui import Main
+from view.gui import LoginWindow
 from view.gui import TestInterface
 
-conf_client = None
+from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtGui import QImage
+
+from util import *
+from common.conf_client import ConferenceClient
+import sys
+
+from view.homescreen import HomeInterface
+
+conf_client = ConferenceClient()
 
 
 class AppController:
+
+    closed = Main.close_signal
+    onNavigateChanged = pyqtSignal(str)
+
     def __init__(self, mainui: Main, loginui: LoginWindow):
         self.mainui = mainui
         self.loginui = loginui
         self.logincontol = LoginController(loginui, self)
         self.testcontrol = TestController(testui=self.mainui.testInterface, app=self)
+        self.homecontrol = HomeController(homeui=self.mainui.homeInterface, app=self)
         self.loginui.close_signal.connect(self.stop)
         self.mainui.close_signal.connect(self.stop)
         # initial other controller
+
+        # connect signal
 
         # test
         self.switch_ui('main')
@@ -45,6 +62,7 @@ class LoginController:
     def __init__(self, loginui: LoginWindow, app: AppController):
         self.loginui = loginui
         self.app = app
+        self.isremember = False # load from config
 
     def register_all_action(self):
         """
@@ -67,12 +85,12 @@ class LoginController:
         # isRemember = self.loginui.checkBox.isChecked()
         # send login request to server
         server_response = conf_client.login(username, password)
-        if server_response:
-            self.loginui.info('success', 'Success', 'Log in successfully')
-            # switch to main view
+        if server_response['status'] == Status.SUCCESS:
+            self.loginui.info('success', 'Success', 'Login successfully')
+            self.remember()
             self.switch_to_main()
         else:
-            self.loginui.info('error', 'Error', 'Username or password is incorrect')
+            self.loginui.info('error', 'Error', 'Failed to login')
 
     def register(self):
         username = self.loginui.lineEdit_3.text()
@@ -83,13 +101,23 @@ class LoginController:
             return
         # send register request to server
         # login automatically if register success
-        server_response = conf_client.register(username, password)
-        if server_response:
+        register_res = conf_client.register(username, password)
+        if register_res['status'] == Status.SUCCESS:
             self.loginui.info('success', 'Success', 'Register successfully')
-            conf_client.login(username, password)
-            self.switch_to_main()
+            login_res = conf_client.login(username, password)
+            if login_res['status'] == Status.SUCCESS:
+                self.loginui.info('success', 'Success', 'Login successfully')
+                self.remember()
+                self.switch_to_main()
+            else:
+                self.loginui.info('error', 'Error', 'Failed to login. Please login again')
         else:
             self.loginui.info('error', 'Error', 'Failed to register')
+
+    def remember(self):
+        if self.isremember:
+            # save to config
+            pass
 
     def switch_to_main(self):
         # switch to main view
@@ -98,6 +126,13 @@ class LoginController:
 
     def stop_thread(self):
         pass
+
+class HomeController:
+
+    def __init__(self, homeui: HomeInterface, app: AppController):
+        self.interface = homeui
+        self.app = app
+        self.meetingCreateHandler = MeetingCreate(self.interface)
 
 class TestController:
 

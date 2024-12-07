@@ -1,5 +1,10 @@
 import uuid
 
+from qfluentwidgets import SearchLineEdit, RoundMenu, Action, TitleLabel, SubtitleLabel, ImageLabel, \
+    SingleDirectionScrollArea, FluentIcon, MessageBoxBase, LineEdit, RadioButton, BodyLabel
+from PyQt5.QtWidgets import QSpacerItem, QSizePolicy, QWidget, QVBoxLayout, QPushButton, QGraphicsDropShadowEffect, \
+    QFrame, QHBoxLayout, QButtonGroup
+from PyQt5.QtGui import QPainter, QPainterPath, QLinearGradient, QBrush, QImage, QIcon, QColor, QDesktopServices
 from PyQt5.QtCore import QRectF, Qt, QSize, QUrl
 from PyQt5.QtGui import QPainter, QPainterPath, QLinearGradient, QBrush, QImage, QIcon, QDesktopServices
 from PyQt5.QtWidgets import QSpacerItem, QSizePolicy, QWidget, QVBoxLayout, QPushButton, QHBoxLayout
@@ -203,8 +208,7 @@ class ConferenceCard(QFrame):
                 color: #9cffd3;
             }
         """)
-        if self.extraButton:
-            self.buttonLayout.addWidget(self.extraButton, 0, Qt.AlignRight)  # extra button for more actions
+
         self.buttonLayout.addWidget(self.joinButton, 0, Qt.AlignRight)
         self.bottomLayout.addLayout(self.buttonLayout)
 
@@ -253,6 +257,25 @@ class ConferenceCard(QFrame):
 
         if w.exec():
             QDesktopServices.openUrl(QUrl('https://github.com'))
+
+class OwnedConferenceCard(ConferenceCard):
+    def __init__(self, title, avatar, id, parent=None):
+        super().__init__(title, avatar, id, parent)
+
+        # change background color to orange gradient
+        self.setStyleSheet("""
+            #conference-card {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #ff9c1a, stop:1 #ff6f1a);
+                border-radius: 10px;
+            }
+            #conference-card:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #ffba6a, stop:1 #ff8f6a);
+            }
+        """)
+
+        self.extraButton = QPushButton
 
 
 class HomeInterface(QFrame):
@@ -315,3 +338,77 @@ class HomeInterface(QFrame):
         self.scrollArea.setWidget(view)
         self.scrollArea.setFrameShape(QFrame.NoFrame)
         self.mainLayout.addWidget(self.scrollArea)
+
+class MeetingConfigMessageBox(MessageBoxBase):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.titleLabel = SubtitleLabel('Meeting configuration', self)
+
+        self.hintLabel = BodyLabel('Please input the meeting name', self)
+
+        self.lineEdit = LineEdit(self)
+        self.lineEdit.setPlaceholderText('Meeting name')
+        self.warningLabel = BodyLabel('Meeting name cannot be empty', self)
+
+        self.selectHintLabel = BodyLabel('Please select the meeting type', self)
+
+        self.typeSingleButton = RadioButton('Single Mode', self)
+        self.singleFlag = False
+        self.typeMultipleButton = RadioButton('Multiple Mode', self)
+        self.multipleFlag = False
+        self._warningLabel = BodyLabel('Please select one of the meeting type', self)
+
+        _typeButtonGroup = QButtonGroup(self)
+        _typeButtonGroup.addButton(self.typeSingleButton)
+        _typeButtonGroup.addButton(self.typeMultipleButton)
+
+        _typeButtonGroup.buttonToggled.connect(lambda button, checked: self.changeSingleFlag() if button == self.typeSingleButton else self.changeMultipleFlag())
+
+        self.typeButtonGroup = _typeButtonGroup
+
+        self.viewLayout.addWidget(self.titleLabel)
+        self.viewLayout.addWidget(self.hintLabel)
+        self.viewLayout.addWidget(self.lineEdit)
+        self.viewLayout.addWidget(self.warningLabel)
+        self.viewLayout.addWidget(self.selectHintLabel)
+        self.viewLayout.addWidget(self.typeSingleButton)
+        self.viewLayout.addWidget(self.typeMultipleButton)
+        self.viewLayout.addWidget(self._warningLabel)
+
+        self.warningLabel.hide()
+        self._warningLabel.hide()
+
+        self.widget.setMinimumWidth(350)
+
+    def meetingName(self):
+        return self.lineEdit.text()
+
+    def meetingType(self):
+        return 'single' if self.singleFlag else 'multiple'
+
+    def changeSingleFlag(self):
+        """
+        handle single radio button is selected
+        """
+        self.singleFlag, self.multipleFlag = True, False
+
+    def changeMultipleFlag(self):
+        """
+        handle multiple radio button is selected
+        """
+        self.singleFlag, self.multipleFlag = False, True
+
+    def validate(self) -> bool:
+        valid_1 = self.lineEdit.text() != ''
+        valid_2 = self.singleFlag ^ self.multipleFlag # only one of them is True
+
+        if not valid_1:
+            self.warningLabel.show()
+        else:
+            self.warningLabel.hide()
+        if not valid_2:
+            self._warningLabel.show()
+        else:
+            self._warningLabel.hide()
+
+        return valid_1 and valid_2
