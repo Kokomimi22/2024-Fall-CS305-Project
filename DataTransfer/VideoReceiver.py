@@ -8,10 +8,9 @@ import numpy as np
 from config import *
 
 class VideoReceiver:
-    def __init__(self, host, port, chunk_size=4096):
+    def __init__(self, host, port):
         self.host = host
         self.port = port
-        self.chunk_size = chunk_size
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((self.host, self.port))
         self.buffer = b''
@@ -28,9 +27,11 @@ class VideoReceiver:
         while True:
             # get方法会阻塞，直到队列中有数据，queue是线程安全的，不要担心多线程问题
             data = self.data_queue.get()
-            data_len = struct.unpack("Q", data[:struct.calcsize("Q")])[0]
-            sequence_number = struct.unpack("I", data[struct.calcsize("Q"):struct.calcsize("Q") + struct.calcsize("I")])[0]
-            chunk_data = data[struct.calcsize("Q") + struct.calcsize("I"):struct.calcsize("Q") + struct.calcsize("I") + VIDEO_CHUNK_SIZE]
+            Q_size = struct.calcsize("Q")
+            I_size = struct.calcsize("I")
+            data_len = struct.unpack("Q", data[:Q_size])[0]
+            sequence_number = struct.unpack("I", data[Q_size:Q_size + I_size])[0]
+            chunk_data = data[Q_size + I_size:Q_size + I_size + VIDEO_CHUNK_SIZE]
 
             self.received_chunks[sequence_number] = chunk_data
 

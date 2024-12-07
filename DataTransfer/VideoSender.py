@@ -33,6 +33,6 @@ class VideoSender:
                 self.sock.sendto(struct.pack("Q", data_len) + struct.pack("I", sequence_number) + chunk, self.dest_addr)
                 sequence_number += 1
             # 帧率不要太高，否则会导致数据包丢失，因为我的接收端并没有做类似于TCP的ACK机制
-            time.sleep(1 / self.frame_rate)
+            time.sleep(1.0 / self.frame_rate)
         self.cap.release()
         self.sock.close()
