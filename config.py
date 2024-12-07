@@ -1,3 +1,5 @@
+from enum import Enum
+from typing import *
 HELP = 'Create         : create an conference\n' \
        'Join [conf_id ]: join a conference with conference ID\n' \
        'Quit           : quit an on-going conference\n' \
@@ -20,3 +22,15 @@ SUCCESSFUL = True
 FAILED = False
 camera_width, camera_height = 480, 480  # resolution for camera capture
 VIDEO_CHUNK_SIZE = 4096
+class MessageType(Enum):
+       LOGIN = 'login'
+       LOGOUT = 'logout'
+       CREATE = 'create_conference'
+       JOIN = 'join_conference'
+       QUIT = 'quit_conference'
+       CANCEL = 'cancel_conference'
+       REGISTER = 'register'
+       INIT = 'init_conference'
+class Status(Enum):
+       SUCCESS = True
+       FAILED = False

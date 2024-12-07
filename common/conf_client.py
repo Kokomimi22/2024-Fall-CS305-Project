@@ -1,3 +1,4 @@
+import json
 import socket
 import threading
 from enum import Enum
@@ -9,14 +10,14 @@ from util import *
 class ConferenceClient:
     def __init__(self, ):
         # sync client
-        self.userInfo = None
+        self.userInfo: User = None
         self.recv_thread = None
         self.is_working = True
-        self.server_addr = None  # server addr
+        self.conf_server_addr = None  # conference server addr
+        self.data_server_addr: Dict[str, Any] = None  # data server in the conference server
         self.on_meeting = False  # status
-        self.conns = None  # you may need to maintain multiple conns for a single conference
-        self.support_data_types = ['screen', 'camera',
-                                   'audio']  # the data types that can be shared, which should be modified
+        self.conns: socket.socket = None  # you may need to maintain multiple conns for a single conference
+        self.support_data_types = ['screen', 'camera', 'audio']  # the data types that can be shared, which should be modified
         self.share_data = {}
         self.sharing_task = None
 
@@ -34,16 +35,20 @@ class ConferenceClient:
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
-            s.sendall(f'create with {self.userInfo.uuid}'.encode())
-            self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
-            if self.recv_data.startswith('Created'):
-                conference_id = self.recv_data.split(' ')[1]
-                print(f'[Info]: Created conference {conference_id}')
-                self.join_conference(conference_id=conference_id)
+            create_request = {
+                'type': MessageType.CREATE.value,
+                'client_id': self.userInfo.uuid
+            }
+            s.sendall(json.dumps(create_request).encode())
+            recv_data: Dict[str, Any] = json.loads(s.recv(CONTROL_LINE_BUFFER).decode('utf-8'))
+            if recv_data['status'] == Status.SUCCESS.value:
+                #成功了就加入会议
+                self.join_conference(recv_data['conference_id'])
+                print(f'[Info]: Created conference {self.conference_id} successfully')
             else:
-                print(f'[Error]: Failed to create conference')
+                print(f'[Error]: {recv_data["message"]}')
 
-    def join_conference(self, conference_id):
+    def join_conference(self, conference_id: int):
         """
         join a conference: send join-conference request with given conference_id, and obtain necessary data to
         """
@@ -52,18 +57,24 @@ class ConferenceClient:
             return
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
-            s.sendall(f'join {conference_id}'.encode())
-            self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
-            if self.recv_data.startswith('Joined'):
-                print(f'[Info]: Joined conference {conference_id}')
+            join_request = {
+                'type': MessageType.JOIN.value,
+                'client_id': self.userInfo.uuid,
+                'conference_id': conference_id
+            }
+            s.sendall(json.dumps(join_request).encode())
+            recv_data = json.loads(s.recv(CONTROL_LINE_BUFFER).decode('utf-8'))
+            if recv_data['status'] == Status.SUCCESS.value:
                 self.conference_id = conference_id
-                conference_ports = self.recv_data.split(' ')[-1]
-                self.server_addr = (SERVER_IP, int(conference_ports))
+                # 记录会议服务器和数据服务器的端口号，以便之后传输数据使用
+                self.conf_server_addr = (SERVER_IP, recv_data['conference_serve_port'])
+                self.data_server_addr = {dataType: (SERVER_IP, port) for dataType, port in recv_data['data_serve_ports'].items()}
                 self.on_meeting = True
-                # start necessary running task for conference
                 self.start_conference()
+                print(f'[Info]: Joined conference {conference_id} successfully')
             else:
                 print(f'[Error]: Failed to join conference {conference_id}')
+
 
     def quit_conference(self):
         """
@@ -72,20 +83,32 @@ class ConferenceClient:
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
             return
-        self.conns.sendall(b'quit')
+        quit_request = {
+            'type': MessageType.QUIT.value,
+            'client_id': self.userInfo.uuid,
+        }
+        self.conns.sendall(json.dumps(quit_request).encode())
 
     def cancel_conference(self):
         """
         cancel your on-going conference (when you are the conference manager): ask server to close all clients
         """
+        if not self.on_meeting:
+            print(f'[Error]: You are not in a conference')
+            return
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
-            s.sendall(f'cancel {self.conference_id} with {self.userInfo.uuid}'.encode())
-            self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
-            if self.recv_data.startswith('Cancelled'):
-                print(f'[Info]: Cancelled conference {self.conference_id}')
+            cancel_request = {
+                'type': MessageType.CANCEL.value,
+                'client_id': self.userInfo.uuid,
+                'conference_id': self.conference_id
+            }
+            s.sendall(json.dumps(cancel_request).encode())
+            recv_data = json.loads(s.recv(CONTROL_LINE_BUFFER).decode('utf-8'))
+            if recv_data['status'] == Status.SUCCESS.value:
+                self.on_meeting = False
             else:
-                print(f'[Error]: Failed to cancel conference {self.conference_id}')
+                print(f'[Error]: {recv_data["message"]}')
 
     def keep_share(self, data_type, send_conn, capture_function, compress=None, fps_or_frequency=30):
         """
@@ -111,7 +134,6 @@ class ConferenceClient:
                 send_conn.sendall(audio_data)
                 send_conn.send(b'eof')
                 time.sleep(1 / fps_or_frequency)
-        pass
 
     def share_switch(self, data_type):
         """
@@ -175,8 +197,12 @@ class ConferenceClient:
         start necessary running task for conference
         """
         self.conns = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.conns.connect(self.server_addr)
-        self.conns.sendall(f'init {self.userInfo.uuid}'.encode())
+        self.conns.connect(self.conf_server_addr)
+        init_request = {
+            'type': MessageType.INIT.value,
+            'client_id': self.userInfo.uuid
+        }
+        self.conns.sendall(json.dumps(init_request).encode())
         self.keep_recv(recv_conn=self.conns, data_type='screen', decompress=None)
 
     def close_conference(self):
@@ -202,49 +228,53 @@ class ConferenceClient:
         """
         execute functions based on the command line input
         """
-        pass
-
-    def register(self, username, password)->bool:
-        """
-        register a new user
-        """
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((SERVER_IP, MAIN_SERVER_PORT))
-            s.sendall(f'register {username} {password}'.encode())
-            self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
-            if self.recv_data.startswith('Registered'):
-                return SUCCESSFUL
+        while True:
+            if not self.on_meeting:
+                status = 'Free'
             else:
-                return FAILED
+                status = f'OnMeeting-{self.conference_id}'
 
-    def login(self, username, password)->bool:
-        """
-        login with username and password
-        """
+            cmd_input = input(f'({status}) Please enter a operation (enter "?" to help): ')
+            self.command_parser(cmd_input)
+
+    def register(self, username, password):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
-            s.sendall(f'login {username} {password}'.encode())
-            self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
-            if self.recv_data.startswith('Logged'):
-                uuid = self.recv_data.split(' ')[-1]
+            message = json.dumps({'type': MessageType.REGISTER.value, 'username': username, 'password': password})
+            s.sendall(message.encode())
+            recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
+            response = json.loads(recv_data)
+            if response['status'] == Status.SUCCESS.value:
+                print('Register successfully')
+            else:
+                print(f"[Error]: {response['message']}")
+
+    def login(self, username, password):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((SERVER_IP, MAIN_SERVER_PORT))
+            message = json.dumps({'type': MessageType.LOGIN.value, 'username': username, 'password': password})
+            s.sendall(message.encode())
+            recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
+            response = json.loads(recv_data)
+            if response['status'] == Status.SUCCESS.value:
+                print('Login successfully')
+                uuid = response['uuid']
                 self.userInfo = User(uuid, username, password)
-                return SUCCESSFUL
             else:
-                return FAILED
+                print(f"[Error]: {response['message']}")
 
     def logout(self):
-        """
-        logout the user
-        """
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
-            s.sendall(f'logout {self.userInfo.uuid}'.encode())
-            self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
-            if self.recv_data.startswith('Logged'):
-                print(f'[Info]: Logged out successfully')
+            message = json.dumps({'type': MessageType.LOGOUT.value, 'uuid': self.userInfo.uuid})
+            s.sendall(message.encode())
+            recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
+            response = json.loads(recv_data)
+            if response.get('status') == Status.SUCCESS.value:
+                print('[Info]: Logged out successfully')
                 self.userInfo = None
             else:
-                print(f'[Error]: Failed to logout')
+                print(f"[Error]: {response['message']}")
 
     def command_parser(self, cmd_input):
         """
@@ -252,14 +282,16 @@ class ConferenceClient:
             """
         cmd_input = cmd_input.strip().lower().strip()
         fields = cmd_input.split(maxsplit=2)
+        if not fields:
+            return
         if fields[0] in ('create', 'join', 'quit', 'cancel') and self.userInfo is None:
             print('[Error]: Please login first')
-            return '[Error]: Please login first'
+            return
         if len(fields) == 1:
             if cmd_input in ('?', '？'):
                 print(HELP)
             elif cmd_input == 'create':
-                return self.create_conference()
+                self.create_conference()
             elif cmd_input == 'quit':
                 self.quit_conference()
             elif cmd_input == 'cancel':
@@ -273,7 +305,7 @@ class ConferenceClient:
         elif len(fields) == 2:
             arg = fields[1]
             if fields[0] == 'join' and arg.isdigit():
-                self.join_conference(arg)
+                self.join_conference(int(arg))
             elif fields[0] == 'switch' and arg in self.support_data_types:
                 self.share_switch(arg)
             elif fields[0] == 'share':
@@ -294,84 +326,6 @@ class ConferenceClient:
                 s.sendall(cmd_input.encode())
                 self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
                 print(f'[Info]: {self.recv_data}')
-
-    def communicate(self, msg, wait_response=True):
-        """
-        communicate with server
-        """
-        try:
-            response = self.command_parser(msg)
-            return response
-        except Exception as e:
-            print(f'[Error]: {e}')
-            return f'[Error]: {e}'
-
-import ast
-
-class Result(object):
-    def __init__(self):
-        """
-        result class for testing
-        """
-        self.status = None
-        self.response = []
-        self.message = ""
-        pass
-
-    def __init__(self, status, response, message):
-        """
-        result class for testing
-        """
-        self.status = status
-        self.response = response
-        self.message = message
-        pass
-
-    def response(self):
-        return self.response
-
-    def message(self):
-        return self.message
-
-    def isSuccess(self):
-        return self.status == self.Status.SUCCESS
-
-    def __repr__(self):
-        return f"Result({self.status}, {self.response}, {self.message})"
-
-    def __eq__(self, other):
-        return self.status == other.status and self.response == other.response and self.message == other.message
-
-    # for jsonify
-    def to_dict(self):
-        return {
-            'status': self.status.value,
-            'response': self.response,
-            'message': self.message
-        }
-
-    def to_json(self):
-        return str(self.to_dict())
-
-    @staticmethod
-    def from_dict(d):
-        try:
-            status = Result.Status.SUCCESS if d['status'] == 0 else Result.Status.FAILED
-            response = d['response']
-            message = d['message']
-            return Result(status, response, message)
-        except KeyError:
-            raise ValueError('Invalid Result dict')
-
-    @staticmethod
-    def from_json(json_str):
-        d = ast.literal_eval(json_str)
-        return Result.from_dict(d)
-
-    class Status(Enum):
-        SUCCESS = 0
-        FAILED = 1
-
 
 if __name__ == '__main__':
     client1 = ConferenceClient()
