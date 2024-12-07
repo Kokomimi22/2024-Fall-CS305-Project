@@ -150,7 +150,8 @@ def qcapture_camera(camera: QCamera):
 
     else:
         image_capture = QCameraImageCapture(camera)
-        image_capture.capture()
+        image_capture.setCaptureDestination(QCameraImageCapture.CaptureToBuffer)
+        image_capture.imageCaptured.connect(lambda d, i: image_capture.stop())
         image = image_capture.image()
         return image
 
@@ -285,4 +286,4 @@ class UUID:
 for device in getAudioOutputDevices():
     print(device.deviceName())
 for device in getVideoDevices():
-    print(device.deviceName())
+    print(device.description())

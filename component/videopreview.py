@@ -75,6 +75,11 @@ class VideoPreview:
         if self.is_preview and self.currentVideoSource:
             self.preview_thread.start()
 
+    def stop_preview(self):
+        self.is_preview = False
+        self.preview_thread.stop()
+        self.view.set_preview(self.DEFAULT_PREVIEW_HOLDER)
+
     def update_aval_source(self):
         avalVideos = getVideoDevices()
         avalVideos.append(Desktop.default())
@@ -86,7 +91,7 @@ class VideoPreview:
                 icon = FluentIcon.CAMERA
             else:
                 icon = FluentIcon.VIDEO
-            self.view.selecsrcButton.addItem(a.deviceName(), icon)
+            self.view.selecsrcButton.addItem(a.description(), icon)
             self.availableVideoSources[i] = a
 
     def handle_source_change(self, index):
@@ -110,6 +115,9 @@ class Desktop:
         pass
 
     def deviceName(self):
+        return 'Desktop Screen'
+
+    def description(self):
         return 'Desktop Screen'
 
     @staticmethod

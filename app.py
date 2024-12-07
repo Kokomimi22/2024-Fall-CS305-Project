@@ -1,4 +1,5 @@
 from component.audiopreview import AudioPreview
+from component.meetingcreate import MeetingCreate
 from component.videopreview import VideoPreview
 from view.gui import Main
 from view.gui import LoginWindow
@@ -11,18 +12,27 @@ from util import *
 from common.conf_client import ConferenceClient
 import sys
 
-conf_client = None
+from view.homescreen import HomeInterface
+
+conf_client = ConferenceClient()
 
 
 class AppController:
+
+    closed = Main.close_signal
+    onNavigateChanged = pyqtSignal(str)
+
     def __init__(self, mainui: Main, loginui: LoginWindow):
         self.mainui = mainui
         self.loginui = loginui
         self.logincontol = LoginController(loginui, self)
         self.testcontrol = TestController(testui=self.mainui.testInterface, app=self)
+        self.homecontrol = HomeController(homeui=self.mainui.homeInterface, app=self)
         self.loginui.close_signal.connect(self.stop)
         self.mainui.close_signal.connect(self.stop)
         # initial other controller
+
+        # connect signal
 
         # test
         self.switch_ui('main')
@@ -102,6 +112,13 @@ class LoginController:
 
     def stop_thread(self):
         pass
+
+class HomeController:
+
+    def __init__(self, homeui: HomeInterface, app: AppController):
+        self.interface = homeui
+        self.app = app
+        self.meetingCreateHandler = MeetingCreate(self.interface)
 
 class TestController:
 

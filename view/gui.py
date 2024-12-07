@@ -6,7 +6,7 @@ from view.loginscreen import LoginWindow
 
 from view.homescreen import HomeInterface
 from view.testscreen import TestInterface
-from view.navigationavatarwidget import NavigationAvatarWidget
+from view.clickednavigationavatarwidget import ClickedNavigationAvatarWidget
 
 from util import *
 
@@ -67,7 +67,9 @@ class Widget(QFrame):
 
 
 class Main(FluentWindow):
+
     close_signal = pyqtSignal()
+
     def __init__(self):
         super().__init__()
         # create sub interface
@@ -87,7 +89,7 @@ class Main(FluentWindow):
         # add custom widget to bottom
         self.navigationInterface.addWidget(
             routeKey='avatar',
-            widget=NavigationAvatarWidget('zhiyiYo', 'resources/shoko.png'),
+            widget=ClickedNavigationAvatarWidget('zhiyiYo', 'resources/shoko.png'),
             onClick=None,
             position=NavigationItemPosition.BOTTOM,
         )
@@ -113,6 +115,7 @@ class Main(FluentWindow):
     def closeEvent(self, event):
         self.close_signal.emit()
         event.accept()
+
 def show():
     # enable dpi scale
     QApplication.setHighDpiScaleFactorRoundingPolicy(
