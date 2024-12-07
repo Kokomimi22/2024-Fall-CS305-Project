@@ -8,8 +8,6 @@ from view.homescreen import HomeInterface
 from view.testscreen import TestInterface
 from view.clickednavigationavatarwidget import ClickedNavigationAvatarWidget
 
-from util import *
-
 from resources import rc
 
 

@@ -7,8 +7,6 @@ from qfluentwidgets import TogglePushButton, HeaderCardWidget, FluentIcon, Title
     ComboBox, SmoothScrollArea, ProgressBar, CardWidget, BodyLabel, ImageLabel, CaptionLabel
 from qfluentwidgets.multimedia.media_play_bar import PlayButton, VolumeButton, FluentStyleSheet
 
-from util import streamout
-
 class TestInterface(SmoothScrollArea):
     class VideoPreviewCard(HeaderCardWidget):
 
@@ -117,7 +115,6 @@ class TestInterface(SmoothScrollArea):
         class SoundVisualizer(CardWidget):
             def __init__(self, parent=None):
                 super().__init__(parent)
-                self.player = streamout # type: pyaudio.Stream
                 self.playButton = PlayButton(self)
                 self.isPlaying = False
                 def toggle_playButton():
