@@ -23,6 +23,7 @@ FAILED = False
 camera_width, camera_height = 480, 480  # resolution for camera capture
 VIDEO_CHUNK_SIZE = 4096
 class MessageType(Enum):
+       GET_CONFERENCES = 'get_conferences'
        LOGIN = 'login'
        LOGOUT = 'logout'
        CREATE = 'create_conference'
@@ -31,6 +32,7 @@ class MessageType(Enum):
        CANCEL = 'cancel_conference'
        REGISTER = 'register'
        INIT = 'init_conference'
+       TEXT_MESSAGE = 'text_message'
 class Status(Enum):
        SUCCESS = True
        FAILED = False

@@ -62,6 +62,7 @@ class LoginController:
     def __init__(self, loginui: LoginWindow, app: AppController):
         self.loginui = loginui
         self.app = app
+        self.isremember = False # load from config
 
     def register_all_action(self):
         """
@@ -84,12 +85,12 @@ class LoginController:
         # isRemember = self.loginui.checkBox.isChecked()
         # send login request to server
         server_response = conf_client.login(username, password)
-        if server_response:
-            self.loginui.info('success', 'Success', 'Log in successfully')
-            # switch to main view
+        if server_response['status'] == Status.SUCCESS:
+            self.loginui.info('success', 'Success', 'Login successfully')
+            self.remember()
             self.switch_to_main()
         else:
-            self.loginui.info('error', 'Error', 'Username or password is incorrect')
+            self.loginui.info('error', 'Error', 'Failed to login')
 
     def register(self):
         username = self.loginui.lineEdit_3.text()
@@ -100,13 +101,23 @@ class LoginController:
             return
         # send register request to server
         # login automatically if register success
-        server_response = conf_client.register(username, password)
-        if server_response:
+        register_res = conf_client.register(username, password)
+        if register_res['status'] == Status.SUCCESS:
             self.loginui.info('success', 'Success', 'Register successfully')
-            conf_client.login(username, password)
-            self.switch_to_main()
+            login_res = conf_client.login(username, password)
+            if login_res['status'] == Status.SUCCESS:
+                self.loginui.info('success', 'Success', 'Login successfully')
+                self.remember()
+                self.switch_to_main()
+            else:
+                self.loginui.info('error', 'Error', 'Failed to login. Please login again')
         else:
             self.loginui.info('error', 'Error', 'Failed to register')
+
+    def remember(self):
+        if self.isremember:
+            # save to config
+            pass
 
     def switch_to_main(self):
         # switch to main view

@@ -208,8 +208,7 @@ class ConferenceCard(QFrame):
                 color: #9cffd3;
             }
         """)
-        if self.extraButton:
-            self.buttonLayout.addWidget(self.extraButton, 0, Qt.AlignRight)  # extra button for more actions
+
         self.buttonLayout.addWidget(self.joinButton, 0, Qt.AlignRight)
         self.bottomLayout.addLayout(self.buttonLayout)
 
@@ -258,6 +257,25 @@ class ConferenceCard(QFrame):
 
         if w.exec():
             QDesktopServices.openUrl(QUrl('https://github.com'))
+
+class OwnedConferenceCard(ConferenceCard):
+    def __init__(self, title, avatar, id, parent=None):
+        super().__init__(title, avatar, id, parent)
+
+        # change background color to orange gradient
+        self.setStyleSheet("""
+            #conference-card {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #ff9c1a, stop:1 #ff6f1a);
+                border-radius: 10px;
+            }
+            #conference-card:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #ffba6a, stop:1 #ff8f6a);
+            }
+        """)
+
+        self.extraButton = QPushButton
 
 
 class HomeInterface(QFrame):

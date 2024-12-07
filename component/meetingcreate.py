@@ -26,4 +26,6 @@ class MeetingCreate:
     def _create_meeting(self):
         print('Creating meeting...')
         print(self.form)
+        self.meeting_created.emit(self.form)
+        # meetingcardgroup.add_meeting(self.form, owned=True)
         pass

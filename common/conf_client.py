@@ -25,6 +25,25 @@ class ConferenceClient:
         self.conference_id = None  # conference_id for distinguish difference conference
         self.recv_data = None  # you may need to save received streamd data from other clients in conference
 
+        self.update_handler = {} # {data_type: handler} for GUI update
+
+    @staticmethod
+    def get_conference_list():
+        """
+        get all available conferences from the server
+        """
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((SERVER_IP, MAIN_SERVER_PORT))
+            message = json.dumps({'type': MessageType.GET_CONFERENCES.value})
+            s.sendall(message.encode())
+            recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
+            response = json.loads(recv_data)
+            if response['status'] == Status.SUCCESS.value:
+                print(response['conferences'])
+            else:
+                print(f"[Error]: {response['message']}")
+            return response
+
     def create_conference(self):
         """
         create a conference: send create-conference request to server and obtain necessary data to
@@ -47,6 +66,7 @@ class ConferenceClient:
                 print(f'[Info]: Created conference {self.conference_id} successfully')
             else:
                 print(f'[Error]: {recv_data["message"]}')
+            return recv_data
 
     def join_conference(self, conference_id: int):
         """
@@ -74,6 +94,7 @@ class ConferenceClient:
                 print(f'[Info]: Joined conference {conference_id} successfully')
             else:
                 print(f'[Error]: Failed to join conference {conference_id}')
+            return recv_data
 
 
     def quit_conference(self):
@@ -109,6 +130,21 @@ class ConferenceClient:
                 self.on_meeting = False
             else:
                 print(f'[Error]: {recv_data["message"]}')
+            return recv_data
+
+    def send_message(self, message):
+        """
+        send message to other clients in the conference
+        """
+        if not self.on_meeting:
+            print(f'[Error]: You are not in a conference')
+            return
+        message_post = {
+            'type': MessageType.TEXT_MESSAGE.value,
+            'client_name': self.userInfo.username,
+            'message': message
+        }
+        self.conns.sendall(json.dumps(message_post).encode())
 
     def keep_share(self, data_type, send_conn, capture_function, compress=None, fps_or_frequency=30):
         """
@@ -168,8 +204,14 @@ class ConferenceClient:
                     self.close_conference()
                     break
                 if _recv_data:
-                    self.recv_data = _recv_data  # bytes concatenation
-                    self.output_data()
+                    try:
+                        message = json.loads(_recv_data.decode())
+                        if message['type'] == MessageType.TEXT_MESSAGE.value and self.update_handler.get('text'):
+                            self.update_handler['text'](message)
+                            print(f'{message["client_name"]}: {message["message"]}')
+                    except UnicodeDecodeError:
+                        print(f'[Info]: Received data: {len(_recv_data)} bytes')
+
 
         self.recv_thread = threading.Thread(target=recv_task)
         self.recv_thread.start()
@@ -248,6 +290,7 @@ class ConferenceClient:
                 print('Register successfully')
             else:
                 print(f"[Error]: {response['message']}")
+            return response
 
     def login(self, username, password):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -262,6 +305,7 @@ class ConferenceClient:
                 self.userInfo = User(uuid, username, password)
             else:
                 print(f"[Error]: {response['message']}")
+            return response
 
     def logout(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -275,6 +319,7 @@ class ConferenceClient:
                 self.userInfo = None
             else:
                 print(f"[Error]: {response['message']}")
+            return response
 
     def command_parser(self, cmd_input):
         """
