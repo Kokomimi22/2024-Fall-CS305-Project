@@ -1,0 +1,20 @@
+import asyncio
+import json
+from asyncio import DatagramProtocol
+
+from config import MessageType
+
+
+class VideoProtocol(DatagramProtocol):
+    def __init__(self, server):
+        self.server = server
+
+    def datagram_received(self, data, addr):
+        if addr not in self.server.clients_addr['camera'].values():
+            request = json.loads(data.decode())
+            if request.get('type') == MessageType.INIT.value:
+                client_id = request['client_id']
+                self.server.clients_addr['camera'][client_id] = addr
+            return
+        asyncio.create_task(self.server.handle_video(data, addr))
+

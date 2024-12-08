@@ -3,6 +3,7 @@ Simple util implementation for video conference
 Including data capture, image compression and image overlap
 Note that you can use your own implementation as well :)
 """
+import socket
 from io import BytesIO
 from pickletools import optimize
 
@@ -15,8 +16,6 @@ from PyQt5.QtMultimedia import QCameraInfo, QAudioDeviceInfo, QAudio, QCamera, Q
     QAudioFormat
 
 from config import *
-import time
-import json
 import uuid
 
 # audio setting
@@ -46,6 +45,14 @@ else:
     can_capture_camera = False
 
 my_screen_size = pyautogui.size()
+
+
+def get_port() -> int:
+    sock = socket.socket()
+    sock.bind(('', 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    return port
 
 
 def resize_image_to_fit_screen(image, my_screen_size):

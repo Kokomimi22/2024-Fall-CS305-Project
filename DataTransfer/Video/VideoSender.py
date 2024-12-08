@@ -9,18 +9,17 @@ from util import compress_image
 
 
 class VideoSender:
-    def __init__(self, camera, dest_addr, client_id: str = None, frame_rate=30):
+    def __init__(self, camera, socket_connection: socket.socket, client_id: str = None, frame_rate=30):
         self.camera = camera
-        self.dest_addr = dest_addr
         self.client_id = client_id.encode('utf-8') if client_id else b''
         self.frame_rate = frame_rate
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.running = False
+        self.sock = socket_connection
+        self._running = False
 
     def start(self):
-        self.running = True
+        self._running = True
         client_id_len = len(self.client_id)
-        while self.running:
+        while self._running:
             frame = self.camera.get_frame()
             if frame is None:
                 continue
@@ -33,15 +32,20 @@ class VideoSender:
             sequence_number = 0
             for i in range(num_chunks):
                 chunk = compressed_data[i * VIDEO_CHUNK_SIZE: (i + 1) * VIDEO_CHUNK_SIZE]
-                self.sock.sendto(
+                self.sock.send(
                     struct.pack("I", client_id_len) + self.client_id +
-                    struct.pack("Q", data_len) + struct.pack("I", sequence_number) + chunk,
-                    self.dest_addr
-                )
+                    struct.pack("Q", data_len) + struct.pack("I", sequence_number) + chunk)
                 sequence_number += 1
             time.sleep(1.0 / self.frame_rate)
-        self.sock.close()
 
     def stop(self):
-        self.running = False
-        # TODO: Send a stop signal to the receiver/server
+        self._running = False
+
+
+    def terminate(self):
+        self.stop()
+        # TODO: Send a terminate signal to the receiver
+        terminate_signal = (struct.pack("I", len(self.client_id))
+                       + self.client_id + struct.pack("Q", 0) + struct.pack("I", 0))\
+                       + b'TERMINATE'
+        self.sock.send(terminate_signal)

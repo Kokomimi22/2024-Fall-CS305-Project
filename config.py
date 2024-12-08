@@ -1,9 +1,10 @@
 from enum import Enum
 from typing import *
 HELP = 'Create         : create an conference\n' \
-       'Join [conf_id ]: join a conference with conference ID\n' \
+       'Join [conf_id]: join a conference with conference ID\n' \
        'Quit           : quit an on-going conference\n' \
-       'Cancel         : cancel your on-going conference (only the manager)\n\n'
+       'Cancel         : cancel your on-going conference (only the manager)\n\n' \
+       'On [datatype]  : turn on the data type\n'
 
 SERVER_IP = '127.0.0.1'
 MAIN_SERVER_PORT = 8888

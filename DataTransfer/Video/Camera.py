@@ -2,7 +2,7 @@ import threading
 from util import capture_camera
 
 class Camera:
-    def __init__(self, camera_id=0, frame_rate=30):
+    def __init__(self):
         self.frame = None
         self.lock = threading.Lock()
         self.running = True

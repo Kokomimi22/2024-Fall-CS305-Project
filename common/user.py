@@ -1,6 +1,5 @@
-from config import *
 from util import *
-
+import json
 class User:
     def __init__(self, uuid: str, username='default', password='password'):
         self.username = username

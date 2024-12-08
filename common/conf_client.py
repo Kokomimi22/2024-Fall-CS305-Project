@@ -1,30 +1,32 @@
-import json
 import socket
 import threading
-from enum import Enum
-
+import json
+import time
+from DataTransfer.Video.VideoReceiver import VideoReceiver
+from DataTransfer.Video.VideoSender import VideoSender
 from common.user import User
 from util import *
-
+from DataTransfer.Video.Camera import Camera
 
 class ConferenceClient:
     def __init__(self, ):
         # sync client
         self.userInfo: User = None
-        self.recv_thread = None
+        self.recv_thread: Dict[str, threading.Thread] = {}
         self.is_working = True
         self.conf_server_addr = None  # conference server addr
         self.data_server_addr: Dict[str, Any] = None  # data server in the conference server
         self.on_meeting = False  # status
-        self.conns: socket.socket = None  # you may need to maintain multiple conns for a single conference
-        self.support_data_types = ['screen', 'camera', 'audio']  # the data types that can be shared, which should be modified
+        self.conns: Dict[str, socket.socket] = {}  # you may need to maintain multiple conns for a single conference
+        self.support_data_types = ['screen', 'camera', 'audio', 'text']  # the data types that can be shared, which should be modified
         self.share_data = {}
         self.sharing_task = None
 
         self.conference_info = None  # you may need to save and update some conference_info regularly
         self.conference_id = None  # conference_id for distinguish difference conference
         self.recv_data = None  # you may need to save received streamd data from other clients in conference
-
+        self.videoSender: VideoSender = None  # you may need to maintain multiple video senders for a single conference
+        self.videoReceiver: VideoReceiver = None
         self.update_handler = {} # {data_type: handler} for GUI update
 
     @staticmethod
@@ -108,7 +110,7 @@ class ConferenceClient:
             'type': MessageType.QUIT.value,
             'client_id': self.userInfo.uuid,
         }
-        self.conns.sendall(json.dumps(quit_request).encode())
+        self.conns['text'].sendall(json.dumps(quit_request).encode())
 
     def cancel_conference(self):
         """
@@ -144,7 +146,7 @@ class ConferenceClient:
             'client_name': self.userInfo.username,
             'message': message
         }
-        self.conns.sendall(json.dumps(message_post).encode())
+        self.conns['text'].sendall(json.dumps(message_post).encode())
 
     def keep_share(self, data_type, send_conn, capture_function, compress=None, fps_or_frequency=30):
         """
@@ -175,7 +177,7 @@ class ConferenceClient:
         """
         switch for sharing certain type of data (screen, camera, audio, etc.)
         """
-        self.conns.sendall(f'share {data_type}'.encode('utf-8'))
+        self.conns['text'].sendall(f'share {data_type}'.encode('utf-8'))
 
         # test keep_share
         _sharing_task = None
@@ -190,7 +192,7 @@ class ConferenceClient:
         self.sharing_task = _sharing_task
         _sharing_task.start()
 
-    def keep_recv(self, recv_conn=None, data_type=None, decompress=None):
+    def keep_recv(self, recv_conn: socket.socket=None):
         """
         running task: keep receiving certain type of data (save or output)
         you can create other functions for receiving various kinds of data
@@ -213,8 +215,8 @@ class ConferenceClient:
                         print(f'[Info]: Received data: {len(_recv_data)} bytes')
 
 
-        self.recv_thread = threading.Thread(target=recv_task)
-        self.recv_thread.start()
+        self.recv_thread['text'] = threading.Thread(target=recv_task)
+        self.recv_thread['text'].start()
 
     def output_data(self):
         """
@@ -223,29 +225,28 @@ class ConferenceClient:
         # write is into a file
         print(f'[Info]: Received data: {self.recv_data}')
 
-    def save_img(self, img_data, img_path):
-        """
-        save image data to a file
-        :param img_data: bytes, image data
-        :param img_path: str, image file path
-        """
-        with open(img_path, 'wb') as f:
-            f.write(img_data)
-
     def start_conference(self):
         """
         init conns when create or join a conference with necessary conference_info
         and
         start necessary running task for conference
         """
-        self.conns = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.conns.connect(self.conf_server_addr)
+        self.conns['text'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.conns['camera'] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.conns['text'].connect(self.conf_server_addr)
+        self.conns['camera'].connect(self.data_server_addr['camera'])
         init_request = {
             'type': MessageType.INIT.value,
             'client_id': self.userInfo.uuid
         }
-        self.conns.sendall(json.dumps(init_request).encode())
-        self.keep_recv(recv_conn=self.conns, data_type='screen', decompress=None)
+        # Establish connection with text data server
+        self.conns['text'].sendall(json.dumps(init_request).encode())
+        self.keep_recv(recv_conn=self.conns['text'])
+        # Establish connection with video data server
+        self.conns['camera'].sendall(json.dumps(init_request).encode())
+        self.videoReceiver = VideoReceiver(self.conns['camera'])
+        self.recv_thread['camera'] = threading.Thread(target=self.videoReceiver.start)
+        self.recv_thread['camera'].start()
 
     def close_conference(self):
         """
@@ -255,16 +256,43 @@ class ConferenceClient:
         self.on_meeting = False
         if self.conns:
             try:
-                self.conns.shutdown(socket.SHUT_RDWR)
+                self.videoSender.terminate()
+                self.videoReceiver.terminate()
+                for conn in self.conns.values():
+                    conn.shutdown(socket.SHUT_RDWR)
             except socket.error as e:
                 print(f"[Error]: Error shutting down connection: {e}")
             finally:
                 try:
-                    self.conns.close()
+                    for conn in self.conns.values():
+                        conn.close()
                     print("[Info]: Connection closed successfully.")
                 except socket.error as e:
                     print(f"[Error]: Error closing connection: {e}")
             self.conns = None
+    def start_video_sender(self):
+        """
+        start video sender for sharing camera data
+        """
+        if not self.on_meeting:
+            print(f'[Error]: You are not in a conference')
+            return
+        if self.videoSender:
+            self.videoSender.start()
+        else:
+            camera = Camera()
+            self.videoSender = VideoSender(camera, self.conns['camera'], self.userInfo.uuid)
+            threading.Thread(target=self.videoSender.start).start()
+
+    def stop_video_sender(self):
+        """
+        stop video sender for sharing camera data
+        """
+        if self.videoSender:
+            self.videoSender.stop()
+            self.videoSender = None
+        else:
+            print(f'[Error]: Video sender is not started')
 
     def start(self):
         """
@@ -355,6 +383,16 @@ class ConferenceClient:
                 self.share_switch(arg)
             elif fields[0] == 'share':
                 self.share_switch(arg)
+            elif fields[0] == 'on':
+                if arg == 'camera':
+                    self.start_video_sender()
+                else:
+                    print('[Error]: Invalid command' + '\r\n' + HELP)
+            elif fields[0] == 'off':
+                if arg == 'camera':
+                    self.stop_video_sender()
+                else:
+                    print('[Error]: Invalid command' + '\r\n' + HELP)
             else:
                 print('[Error]: Invalid command' + '\r\n' + HELP)
         elif len(fields) == 3:

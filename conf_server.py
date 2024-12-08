@@ -1,41 +1,29 @@
-import json
+import asyncio
 import random
 import socket
 import threading
 from codecs import StreamWriter, StreamReader
-from http.client import responses
-
+import json
+from Protocol.VideoProtocol import VideoProtocol
 from common.user import *
-
-import asyncio
-
 
 class ConferenceServer:
     def __init__(self, manager_id: str, conference_id: int, conf_serve_port: int):
-        # the ip address of the manager
+        self.transport: Dict[str, asyncio.DatagramTransport] = {} # self.transport[datatype] = transport
+        # the uuid of the manager of the conference
         self.manager_id: str = manager_id  # str(uuid)
         self.conference_id: int = conference_id
         self.conf_serve_port: int = conf_serve_port
         self.data_serve_ports = {}
-        self.data_types: List[str] = ['screen', 'camera', 'audio']
+        self.data_types: List[str] = ['screen', 'camera', 'audio', 'text']
         self.clients_info = []
         self.client_conns = {}
+        # self.clients_addr[datatype][client_id] = addr
+        # ,it is used to store the address of the client when transmitting screen, camera, and audio data
+        self.clients_addr = {datatype: {} for datatype in self.data_types if datatype != 'text'}
         self.mode = 'Client-Server'
         self.running = True
         self.loop = asyncio.new_event_loop()
-
-    async def handle_data(self, reader: StreamReader, writer: StreamWriter, data_type):
-        """
-        Receive sharing stream data from a client and forward it to the rest of the clients.
-        """
-        while self.running:
-            data = await reader.read(DATA_LINE_BUFFER)
-            if not data or data == b'end':
-                break
-            for client_reader, client_writer in self.client_conns.values():
-                if client_writer != writer:
-                    client_writer.write(data)
-                    await client_writer.drain()
 
     async def handle_client(self, reader: StreamReader, writer: StreamWriter):
         """
@@ -97,6 +85,10 @@ class ConferenceServer:
                 client_writer.write(json.dumps(emit_message).encode())
                 await client_writer.drain()
 
+    async def handle_video(self, data, addr):
+        for client_addr in self.clients_addr['camera'].values():
+            if client_addr != addr:
+                self.transport['camera'].sendto(data, client_addr)
 
     async def log(self):
         try:
@@ -110,6 +102,7 @@ class ConferenceServer:
         self.running = False
         await self.cancel_conference()
         self.loop.stop()
+
 
     async def cancel_conference(self):
         """
@@ -125,11 +118,13 @@ class ConferenceServer:
         # self.loop.stop()
 
     def start(self):
-        """
-        Start the ConferenceServer and necessary running tasks to handle clients in this conference.
-        """
         server_coro = asyncio.start_server(self.handle_client, '127.0.0.1', self.conf_serve_port)
+        video_server_coro = self.loop.create_datagram_endpoint(
+            lambda: VideoProtocol(self),
+            local_addr=('127.0.0.1', self.data_serve_ports['camera'])
+        )
         server = self.loop.run_until_complete(server_coro)
+        self.transport['camera'], _ = self.loop.run_until_complete(video_server_coro)
         self.loop.create_task(self.log())
         try:
             self.loop.run_forever()
@@ -141,6 +136,8 @@ class ConferenceServer:
         finally:
             if not self.loop.is_closed():
                 server.close()
+                for transport in self.transport.values():
+                    transport.close()
                 self.loop.run_until_complete(server.wait_closed())
                 if self.running:
                     self.running = False
@@ -160,12 +157,6 @@ class MainServer:
         self.user_manager = UserManager()
 
     @staticmethod
-    def _get_port() -> int:
-        sock = socket.socket()
-        sock.bind(('', 0))
-        port = sock.getsockname()[1]
-        sock.close()
-        return port
 
     def handle_get_conferences(self):
         """
@@ -186,11 +177,11 @@ class MainServer:
             conference_id = random.randint(1000, 9999)
 
         # 会议服务器的端口号
-        conference_port = self._get_port()
+        conference_port = get_port()
         conference_server = ConferenceServer(client_id, conference_id, conference_port)
         # 为会议服务器的每个数据服务器生成端口号
         for dataType in conference_server.data_types:
-            conference_server.data_serve_ports[dataType] = self._get_port()
+            conference_server.data_serve_ports[dataType] = get_port()
         self.conference_servers[conference_id] = conference_server
         # 启动会议服务器
         conference_thread = threading.Thread(target=conference_server.start)
