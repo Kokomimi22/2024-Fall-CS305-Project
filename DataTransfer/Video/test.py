@@ -1,14 +1,24 @@
 import threading
+import socket
+
 from VideoReceiver import VideoReceiver
 from VideoSender import VideoSender
 from Camera import Camera
 
 def main():
     camera = Camera()
-    receiver = VideoReceiver('localhost', 10000)
-    sender1 = VideoSender(camera, ('localhost', 10000), 'client1')
-    sender2 = VideoSender(camera, ('localhost', 10000), 'client2')
-    sender3 = VideoSender(camera, ('localhost', 10000), 'client3')
+    socket_connection = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    socket_connection.bind(('localhost', 10000))
+    receiver = VideoReceiver(socket_connection)
+    socket1 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    socket1.connect(('localhost', 10000))
+    sender1 = VideoSender(camera, socket1, 'client1')
+    socket2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    socket2.connect(('localhost', 10000))
+    sender2 = VideoSender(camera, socket2, 'client2')
+    socket3 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    socket3.connect(('localhost', 10000))
+    sender3 = VideoSender(camera, socket3, 'client3')
     sender1_thread = threading.Thread(target=sender1.start)
     sender2_thread = threading.Thread(target=sender2.start)
     sender3_thread = threading.Thread(target=sender3.start)

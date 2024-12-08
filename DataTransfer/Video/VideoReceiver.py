@@ -33,8 +33,12 @@ class VideoReceiver:
 
     def receive_data(self):
         while self._running:
-            data, _ = self.sock.recvfrom(65535)
-            self.data_queue.put(data)
+            try:
+                data, _ = self.sock.recvfrom(65535)
+                self.data_queue.put(data)
+            except ConnectionResetError:
+                print("Connection reset by peer")
+                break
 
     def process_data(self):
         batch_size = 15  # Process 15 frames at a time

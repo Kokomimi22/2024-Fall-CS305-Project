@@ -5,7 +5,6 @@ Note that you can use your own implementation as well :)
 """
 import socket
 from io import BytesIO
-from pickletools import optimize
 
 import pyaudio
 import cv2

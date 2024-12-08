@@ -48,4 +48,7 @@ class VideoSender:
         terminate_signal = (struct.pack("I", len(self.client_id))
                        + self.client_id + struct.pack("Q", 0) + struct.pack("I", 0))\
                        + b'TERMINATE'
-        self.sock.send(terminate_signal)
+        try:
+             self.sock.send(terminate_signal)
+        except OSError:
+            pass

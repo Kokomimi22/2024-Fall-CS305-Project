@@ -3,8 +3,8 @@ from typing import *
 HELP = 'Create         : create an conference\n' \
        'Join [conf_id]: join a conference with conference ID\n' \
        'Quit           : quit an on-going conference\n' \
-       'Cancel         : cancel your on-going conference (only the manager)\n\n' \
-       'On [datatype]  : turn on the data type\n'
+       'Cancel         : cancel your on-going conference (only the manager)\n' \
+       'On [datatype]  : turn on the data type\n\n' \
 
 SERVER_IP = '127.0.0.1'
 MAIN_SERVER_PORT = 8888
@@ -21,8 +21,8 @@ SAMPLE_SIZE = 16  # Sample size for audio capture
 CODE_C = 'audio/pcm'  # Codec for audio capture
 SUCCESSFUL = True
 FAILED = False
-camera_width, camera_height = 480, 480  # resolution for camera capture
-VIDEO_CHUNK_SIZE = 9192  # UDP
+camera_width, camera_height = 480, 480
+VIDEO_CHUNK_SIZE = 20000  # UDP
 class MessageType(Enum):
        GET_CONFERENCES = 'get_conferences'
        LOGIN = 'login'
