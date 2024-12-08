@@ -1,11 +1,14 @@
 import queue
-import threading
 import socket
 import struct
+import threading
 import zlib
+
 import cv2
 import numpy as np
+
 from config import *
+from util import decompress_image, overlay_camera_images
 
 
 class VideoReceiver:
@@ -19,6 +22,7 @@ class VideoReceiver:
         self.received_chunks = {}  # Dictionary to store received chunks for each client
         self.frames = {}  # Dictionary to store the latest frame for each client
         self.data_queue = queue.Queue()
+        self.running = False
 
     @staticmethod
     def _unpack_data(data):
@@ -32,64 +36,62 @@ class VideoReceiver:
         return client_id, data_len, sequence_number, chunk_data
 
     def receive_data(self):
-        while True:
+        while self.running:
             data, _ = self.sock.recvfrom(DATA_LINE_BUFFER << 3)
             self.data_queue.put(data)
 
     def process_data(self):
-        while True:
+        batch_size = 15  # Process 15 frames at a time
+        batch = []
+        while self.running:
             data = self.data_queue.get()
-            client_id, data_len, sequence_number, chunk_data = self._unpack_data(data)
-            if client_id not in self.expected_sequences:
-                self.expected_sequences[client_id] = 0
-                self.received_chunks[client_id] = {}
-                self.buffers[client_id] = b''
-            self.received_chunks[client_id][sequence_number] = chunk_data
-
-            while self.expected_sequences[client_id] in self.received_chunks[client_id]:
-                self.buffers[client_id] += self.received_chunks[client_id].pop(self.expected_sequences[client_id])
-                self.expected_sequences[client_id] += 1
-            if len(self.buffers[client_id]) < data_len:
+            batch.append(data)
+            if len(batch) < batch_size:
                 continue
-            try:
-                decompressed_data = zlib.decompress(self.buffers[client_id])
-                frame = cv2.imdecode(np.frombuffer(decompressed_data, np.uint8), cv2.IMREAD_COLOR)
-                self.frames[client_id] = frame
-                self.buffers[client_id] = b''  # Reset for next frame
-                self.expected_sequences[client_id] = 0
-            except zlib.error:
-                print(f"Error decompressing data for client {client_id}")
-                break
+            for data in batch:
+                client_id, data_len, sequence_number, chunk_data = self._unpack_data(data)
+                if client_id not in self.expected_sequences:
+                    self.expected_sequences[client_id] = 0
+                    self.received_chunks[client_id] = {}
+                    self.buffers[client_id] = b''
+                self.received_chunks[client_id][sequence_number] = chunk_data
+
+                while self.expected_sequences[client_id] in self.received_chunks[client_id]:
+                    self.buffers[client_id] += self.received_chunks[client_id].pop(self.expected_sequences[client_id])
+                    self.expected_sequences[client_id] += 1
+                if len(self.buffers[client_id]) < data_len:
+                    continue
+                try:
+                    frame = decompress_image(self.buffers[client_id])
+                    self.frames[client_id] = frame
+                    self.buffers[client_id] = b''  # Reset for next frame
+                    self.expected_sequences[client_id] = 0
+                except zlib.error:
+                    print(f"Error decompressing data for client {client_id}")
+                    break
+            batch.clear()
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
         self.sock.close()
         cv2.destroyAllWindows()
 
+
     def display_frames(self):
-        while True:
+        while self.running:
             if self.frames:
-                grid_frame = self._create_grid_frame()
-                cv2.imshow("Video Grid", grid_frame)
+                screen_image = None  # TODO: Replace with actual screen image if available
+                camera_images = list(self.frames.values())
+                grid_frame = overlay_camera_images(screen_image, camera_images)
+                grid_frame_cv = np.array(grid_frame)  # Convert PIL.Image to numpy array for OpenCV
+                cv2.imshow("Video Grid", grid_frame_cv)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
         cv2.destroyAllWindows()
-
-    def _create_grid_frame(self):
-        frames = list(self.frames.values())
-        num_frames = len(frames)
-        grid_size = int(np.ceil(np.sqrt(num_frames)))
-        frame_height, frame_width = frames[0].shape[:2]
-        grid_frame = np.zeros((frame_height * grid_size, frame_width * grid_size, 3), dtype=np.uint8)
-
-        for idx, frame in enumerate(frames):
-            row = idx // grid_size
-            col = idx % grid_size
-            grid_frame[row * frame_height:(row + 1) * frame_height, col * frame_width:(col + 1) * frame_width] = frame
-
-        return grid_frame
-
+    def stop(self):
+        self.running = False
     def start(self):
+        self.running = True
         receive_thread = threading.Thread(target=self.receive_data)
         process_thread = threading.Thread(target=self.process_data)
         display_thread = threading.Thread(target=self.display_frames)

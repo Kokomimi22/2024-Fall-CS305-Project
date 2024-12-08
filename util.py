@@ -4,6 +4,8 @@ Including data capture, image compression and image overlap
 Note that you can use your own implementation as well :)
 """
 from io import BytesIO
+from pickletools import optimize
+
 import pyaudio
 import cv2
 import pyautogui
@@ -70,8 +72,13 @@ def resize_image_to_fit_screen(image, my_screen_size):
 
 def overlay_camera_images(screen_image, camera_images):
     """
-    screen_image: PIL.Image
-    camera_images: list[PIL.Image]
+    The overlay_camera_images function is used to overlay multiple camera images onto a screen image.
+    It takes a screen image and a list of camera images as input, resizes the screen image to fit the screen size,
+    and arranges the camera images in a grid layout on top of the screen image.
+    If no screen image is provided, it creates a blank container to hold the camera images.
+    :param screen_image: PIL.Image
+    :param camera_images: list[PIL.Image]
+    :return: PIL.Image
     """
     if screen_image is None and camera_images is None:
         print('[Warn]: cannot display when screen and camera are both None')
@@ -162,7 +169,7 @@ def capture_voice():
     raise RuntimeError("This method can't be called currently")
 
 
-def compress_image(image, format='JPEG', quality=85):
+def compress_image(image: Image, format='JPEG', quality=85):
     """
     compress image and output Bytes
 
@@ -172,7 +179,7 @@ def compress_image(image, format='JPEG', quality=85):
     :return: bytes, compressed image data
     """
     img_byte_arr = BytesIO()
-    image.save(img_byte_arr, format=format, quality=quality)
+    image.save(img_byte_arr, format=format, quality=quality, optimize=True)
     img_byte_arr = img_byte_arr.getvalue()
 
     return img_byte_arr

@@ -1,10 +1,8 @@
 import threading
-import cv2
+from util import capture_camera
 
 class Camera:
     def __init__(self, camera_id=0, frame_rate=30):
-        self.cap = cv2.VideoCapture(camera_id)
-        self.cap.set(cv2.CAP_PROP_FPS, frame_rate)
         self.frame = None
         self.lock = threading.Lock()
         self.running = True
@@ -13,8 +11,8 @@ class Camera:
 
     def update_frame(self):
         while self.running:
-            ret, frame = self.cap.read()
-            if ret:
+            frame = capture_camera()
+            if frame:
                 with self.lock:
                     self.frame = frame
 
@@ -25,4 +23,3 @@ class Camera:
     def stop(self):
         self.running = False
         self.thread.join()
-        self.cap.release()
