@@ -335,10 +335,15 @@ class ChatCardView(HeaderCardWidget):
         self.mainLayout.addWidget(CardSeparator(self))
         self.mainLayout.addLayout(self.bottomLayout)
 
-
         self.viewLayout.addLayout(self.mainLayout)
+    
+    def addMessage(self, name, message):
+        pass
 
 class MeetingInterfaceBase(MeetingWindow):
+
+    close_signal = pyqtSignal(bool)
+
     def __init__(self, parent=None):
         super().__init__(parent=parent)
 
@@ -412,10 +417,18 @@ class MeetingInterfaceBase(MeetingWindow):
     def resizeEvent(self, e):
         super().resizeEvent(e)
 
+    def closeEvent(self, e):
+        super().closeEvent(e)
+        self.close_signal.emit(True)
+
 
 
 
 if __name__ == "__main__":
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
     app = QApplication(sys.argv)
     window = MeetingInterfaceBase()
     window.show()
