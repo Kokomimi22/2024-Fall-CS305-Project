@@ -46,7 +46,6 @@ class VideoSender:
                 packet = (struct.pack("I", client_id_len) +
                           self.client_id + struct.pack("Q", data_len) +
                           struct.pack("I", sequence_number) +
-                          struct.pack("d", time.time()) +
                           chunk)
                 self.sock.send(packet)
                 sequence_number += 1

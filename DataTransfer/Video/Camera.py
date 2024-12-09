@@ -20,8 +20,9 @@ class Camera:
             return self.frame
 
     def stop(self):
-        self.running = False
-        self.thread.join()
-        with self.lock:
-            self.frame = None
-        release_camera()
+        if self.running:
+            self.running = False
+            self.thread.join()
+            with self.lock:
+                self.frame = (False, None)
+            release_camera()

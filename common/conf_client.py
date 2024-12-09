@@ -230,7 +230,6 @@ class ConferenceClient:
                     print("[Info]: Connection closed successfully.")
                 except socket.error as e:
                     print(f"[Error]: Error closing connection: {e}")
-            self.conns = None
 
     def start_video_sender(self):
         """
