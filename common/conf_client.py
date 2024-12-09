@@ -267,7 +267,9 @@ class ConferenceClient:
                 status = f'OnMeeting-{self.conference_id}'
 
             cmd_input = input(f'({status}) Please enter a operation (enter "?" to help): ')
-            self.command_parser(cmd_input)
+            s = self.command_parser(cmd_input)
+            if not s:
+                break
 
     def register(self, username, password):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -335,6 +337,7 @@ class ConferenceClient:
                 if self.on_meeting:
                     self.logout()
                     self.quit_conference()
+                return False
             else:
                 print('[Error]: Invalid command' + '\r\n' + HELP)
         elif len(fields) == 2:
@@ -367,7 +370,7 @@ class ConferenceClient:
                 s.sendall(cmd_input.encode())
                 self.recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
                 print(f'[Info]: {self.recv_data}')
-
+        return True
 
 if __name__ == '__main__':
     client1 = ConferenceClient()

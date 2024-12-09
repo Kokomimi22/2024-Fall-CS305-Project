@@ -24,13 +24,16 @@ class VideoReceiver:
 
     @staticmethod
     def _unpack_data(data):
-        client_id_len = struct.unpack("I", data[:4])[0]
-        client_id = data[4:4 + client_id_len].decode('utf-8')
-        Q_size = struct.calcsize("Q")
-        I_size = struct.calcsize("I")
-        data_len = struct.unpack("Q", data[4 + client_id_len:4 + client_id_len + Q_size])[0]
-        sequence_number = struct.unpack("I", data[4 + client_id_len + Q_size:4 + client_id_len + Q_size + I_size])[0]
-        chunk_data = data[4 + client_id_len + Q_size + I_size:]
+        offset = 0
+        client_id_len = struct.unpack_from("I", data, offset)[0]
+        offset += struct.calcsize("I")
+        client_id = data[offset:offset + client_id_len].decode('utf-8')
+        offset += client_id_len
+        data_len = struct.unpack_from("Q", data, offset)[0]
+        offset += struct.calcsize("Q")
+        sequence_number = struct.unpack_from("I", data, offset)[0]
+        offset += struct.calcsize("I")
+        chunk_data = data[offset:]
         return client_id, data_len, sequence_number, chunk_data
 
     def receive_data(self):
