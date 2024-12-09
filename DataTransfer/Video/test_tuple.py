@@ -1,9 +1,11 @@
-import threading
 import socket
+import threading
+import time
 
+from Camera import Camera
 from VideoReceiver import VideoReceiver
 from VideoSender import VideoSender
-from Camera import Camera
+
 
 def main():
     camera = Camera()
@@ -29,12 +31,16 @@ def main():
     sender3_thread.start()
     receiver_thread.start()
 
+    time.sleep(20)
+    sender1.terminate()
+    sender2.terminate()
+    sender3.terminate()
+    receiver.terminate()
+
     sender1_thread.join()
     sender2_thread.join()
     sender3_thread.join()
     receiver_thread.join()
-
-    camera.stop()
 
 if __name__ == "__main__":
     main()

@@ -76,59 +76,34 @@ def resize_image_to_fit_screen(image, my_screen_size):
     return resized_image
 
 
-def overlay_camera_images(screen_image, camera_images):
+def overlay_camera_images(camera_images: List[np.array], grid_size=(2, 2)):
     """
-    The overlay_camera_images function is used to overlay multiple camera images onto a screen image.
-    It takes a screen image and a list of camera images as input, resizes the screen image to fit the screen size,
-    and arranges the camera images in a grid layout on top of the screen image.
-    If no screen image is provided, it creates a blank container to hold the camera images.
-    :param screen_image: PIL.Image
-    :param camera_images: list[PIL.Image]
-    :return: PIL.Image
+    Overlay multiple camera images into a grid.
+
+    :param camera_images: list of np.array, list of camera images
+    :param grid_size: tuple, grid size (rows, columns)
+    :return: np.array, combined image in numpy array format
     """
-    if screen_image is None and camera_images is None:
-        print('[Warn]: cannot display when screen and camera are both None')
-        return None
-    if screen_image is not None:
-        screen_image = resize_image_to_fit_screen(screen_image, my_screen_size)
+    if not camera_images:
+        raise ValueError("No camera images to overlay")
 
-    if camera_images is not None:
-        # make sure same camera images
-        if not all(img.size == camera_images[0].size for img in camera_images):
-            raise ValueError("All camera images must have the same size")
+    # Determine the size of each cell in the grid
+    cell_height, cell_width, _ = camera_images[0].shape
 
-        screen_width, screen_height = my_screen_size if screen_image is None else screen_image.size
-        camera_width, camera_height = camera_images[0].size
+    # Create a blank image for the grid
+    grid_height = cell_height * grid_size[0]
+    grid_width = cell_width * grid_size[1]
+    grid_image = np.zeros((grid_height, grid_width, 3), dtype=np.uint8)
 
-        # calculate num_cameras_per_row
-        num_cameras_per_row = screen_width // camera_width
+    # Paste each camera image into the grid
+    for idx, camera_image in enumerate(camera_images):
+        row = idx // grid_size[1]
+        col = idx % grid_size[1]
+        y = row * cell_height
+        x = col * cell_width
+        grid_image[y:y + cell_height, x:x + cell_width] = camera_image
 
-        # adjust camera_imgs
-        if len(camera_images) > num_cameras_per_row:
-            adjusted_camera_width = screen_width // len(camera_images)
-            adjusted_camera_height = (adjusted_camera_width * camera_height) // camera_width
-            camera_images = [img.resize((adjusted_camera_width, adjusted_camera_height), Image.LANCZOS) for img in
-                             camera_images]
-            camera_width, camera_height = adjusted_camera_width, adjusted_camera_height
-            num_cameras_per_row = len(camera_images)
-
-        # if no screen_img, create a container
-        if screen_image is None:
-            display_image = Image.fromarray(np.zeros((camera_width, my_screen_size[1], 3), dtype=np.uint8))
-        else:
-            display_image = screen_image
-        # cover screen_img using camera_images
-        for i, camera_image in enumerate(camera_images):
-            row = i // num_cameras_per_row
-            col = i % num_cameras_per_row
-            x = col * camera_width
-            y = row * camera_height
-            display_image.paste(camera_image, (x, y))
-
-        return display_image
-    else:
-        return screen_image
-
+    return grid_image
 
 def capture_screen():
     # capture screen with the resolution of display
@@ -137,12 +112,12 @@ def capture_screen():
     return img
 
 
-def capture_camera():
+def capture_camera()->np.array:
     # capture frame of camera
     ret, frame = cap.read()
     if not ret:
         raise Exception('Fail to capture frame from camera')
-    return Image.fromarray(frame)
+    return ret, frame
 
 def release_camera():
     global cap

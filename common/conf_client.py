@@ -270,6 +270,7 @@ class ConferenceClient:
             s = self.command_parser(cmd_input)
             if not s:
                 break
+        print(threading.enumerate())
 
     def register(self, username, password):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -320,10 +321,10 @@ class ConferenceClient:
         cmd_input = cmd_input.strip().lower().strip()
         fields = cmd_input.split(maxsplit=2)
         if not fields:
-            return
+            return True
         if fields[0] in ('create', 'join', 'quit', 'cancel') and self.userInfo is None:
             print('[Error]: Please login first')
-            return
+            return True
         if len(fields) == 1:
             if cmd_input in ('?', '？'):
                 print(HELP)
@@ -338,6 +339,7 @@ class ConferenceClient:
                     self.logout()
                     self.quit_conference()
                 return False
+
             else:
                 print('[Error]: Invalid command' + '\r\n' + HELP)
         elif len(fields) == 2:

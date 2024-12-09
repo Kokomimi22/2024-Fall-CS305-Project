@@ -20,8 +20,8 @@ SAMPLE_SIZE = 16  # Sample size for audio capture
 CODE_C = 'audio/pcm'  # Codec for audio capture
 SUCCESSFUL = True
 FAILED = False
-camera_width, camera_height = 960, 960  # resolution for camera capture
-VIDEO_CHUNK_SIZE = 30000  # UDP
+camera_width, camera_height = 480, 480  # resolution for camera capture
+VIDEO_CHUNK_SIZE = 20000  # UDP
 class MessageType(Enum):
        GET_CONFERENCES = 'get_conferences'
        LOGIN = 'login'
