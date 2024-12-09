@@ -144,6 +144,11 @@ def capture_camera():
         raise Exception('Fail to capture frame from camera')
     return Image.fromarray(frame)
 
+def release_camera():
+    global cap
+    if cap.isOpened():
+        cap.release()
+
 def qcapture_audio(audioinput: QAudioInput):
     # capture frame of camera
     if audioinput is None:

@@ -52,6 +52,8 @@ class ConferenceServer:
                     print(f"Unknown message: {message}")
         except asyncio.CancelledError:
             pass
+        except ConnectionResetError:
+            print(f"Connection reset by peer {addr}")
         finally:
             del self.client_conns[addr]
             self.clients_info.remove(addr)
@@ -111,11 +113,14 @@ class ConferenceServer:
         print(f"Attempting to cancel conference {self.conference_id}...")
         # Cancel all tasks
         tasks = [task for task in asyncio.all_tasks(self.loop) if task is not asyncio.current_task()]
-        for task in tasks:
-            task.cancel()
+        success = np.array([task.cancel() for task in tasks])
+        for client_addr in self.clients_addr['camera'].values():
+            self.transport['camera'].sendto(b'Cancelled', client_addr)
         await asyncio.gather(*tasks, return_exceptions=True)
-        print(f"Conference {self.conference_id} successfully cancelled.")
-        # self.loop.stop()
+        if success.all():
+            print(f"Conference {self.conference_id} successfully cancelled.")
+        else:
+            print(f"Failed to cancel conference {self.conference_id}.")
 
     def start(self):
         server_coro = asyncio.start_server(self.handle_client, '127.0.0.1', self.conf_serve_port)

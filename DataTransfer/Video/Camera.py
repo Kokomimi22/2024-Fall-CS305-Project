@@ -1,5 +1,6 @@
 import threading
-from util import capture_camera
+from util import capture_camera, release_camera
+
 
 class Camera:
     def __init__(self):
@@ -15,7 +16,6 @@ class Camera:
             if frame:
                 with self.lock:
                     self.frame = frame
-
     def get_frame(self):
         with self.lock:
             return self.frame
@@ -23,3 +23,6 @@ class Camera:
     def stop(self):
         self.running = False
         self.thread.join()
+        with self.lock:
+            self.frame = None
+        release_camera()

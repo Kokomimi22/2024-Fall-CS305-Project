@@ -4,12 +4,13 @@ import time
 
 from PIL import Image
 
+from DataTransfer.Video.Camera import Camera
 from config import *
 from util import compress_image
 
 
 class VideoSender:
-    def __init__(self, camera, socket_connection: socket.socket, client_id: str = None, frame_rate=30):
+    def __init__(self, camera: Camera, socket_connection: socket.socket, client_id: str = None, frame_rate=30):
         self.camera = camera
         self.client_id = client_id.encode('utf-8') if client_id else b''
         self.frame_rate = frame_rate
@@ -40,11 +41,11 @@ class VideoSender:
 
     def stop(self):
         self._running = False
+        self.camera.stop()
 
 
     def terminate(self):
         self.stop()
-        # TODO: Send a terminate signal to the receiver
         terminate_signal = (struct.pack("I", len(self.client_id))
                        + self.client_id + struct.pack("Q", 0) + struct.pack("I", 0))\
                        + b'TERMINATE'
