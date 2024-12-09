@@ -27,6 +27,15 @@ class ConferenceClient:
 
         self.update_handler = {} # {data_type: handler} for GUI update
 
+    def user(self):
+        return self.userInfo
+
+    def isWorking(self):
+        return self.is_working
+
+    def hasOnMeeting(self):
+        return self.on_meeting
+
     @staticmethod
     def get_conference_list():
         """

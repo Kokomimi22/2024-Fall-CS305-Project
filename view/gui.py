@@ -67,6 +67,7 @@ class Widget(QFrame):
 class Main(FluentWindow):
 
     close_signal = pyqtSignal()
+    onNavigateChanged = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -88,7 +89,7 @@ class Main(FluentWindow):
         self.navigationInterface.addWidget(
             routeKey='avatar',
             widget=ClickedNavigationAvatarWidget('zhiyiYo', 'resources/shoko.png'),
-            onClick=None,
+            onClick=lambda : self.onNavigateChanged.emit(),
             position=NavigationItemPosition.BOTTOM,
         )
 

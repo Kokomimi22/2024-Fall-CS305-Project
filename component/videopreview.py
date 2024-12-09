@@ -18,6 +18,7 @@ class Work(QThread):
         super(Work, self).__init__()
         self.restInterval = restInterval # ms
         self.currentVideoSource = None
+        self.cameraCapture = None
 
     def run(self):
         while not self.isInterruptionRequested():
@@ -26,13 +27,9 @@ class Work(QThread):
                 return
             elif isinstance(self.currentVideoSource, Desktop):
                 img = capture_screen().toqimage()  # return QImage
-            elif isinstance(self.currentVideoSource, QCameraInfo):
-                try:
-                    img = qcapture_camera(QCamera(self.currentVideoSource))
-                except Exception as e:
-                    print(e)
-
-            self.trigger.emit(img.copy())
+                self.trigger.emit(img.copy())
+            else:
+                self.cameraCapture.capture()
             self.msleep(self.restInterval)
 
     def stop(self):
@@ -45,6 +42,9 @@ class Work(QThread):
     def setVideoSource(self, source):
         self.currentVideoSource = source
 
+    def setCameraCapture(self, cameraCapture):
+        self.cameraCapture = cameraCapture
+
 class VideoPreview:
 
     DEFAULT_PREVIEW_HOLDER = VideoPreviewCardView.DEFAULT_PREVIEW_HOLDER
@@ -56,6 +56,8 @@ class VideoPreview:
 
         self.currentVideoSource = Desktop.default()
         self.availableVideoSources = {} # {sourceIndex: source}
+        self.camera = None
+        self.cameraCapture = None
 
         self.view.previewstartbutton.toggled.connect(self.handle_toggle)
         self.view.selecsrcButton.clicked.connect(self.update_aval_source)
@@ -64,17 +66,32 @@ class VideoPreview:
 
         self.view.previewstartbutton.setDisabled(True) # disable start preview button
 
+    def _init_camera(self, cameraInfo):
+        self.camera = QCamera(cameraInfo)
+        self.camera.setCaptureMode(QCamera.CaptureStillImage)
+
+    def _init_camera_capture(self):
+        self.cameraCapture = QCameraImageCapture(self.camera)
+        self.cameraCapture.setCaptureDestination(QCameraImageCapture.CaptureToBuffer)
+        self.cameraCapture.imageCaptured.connect(self.render_preview_from_camera)
+
     def handle_toggle(self):
         self.is_preview = not self.is_preview
 
         if not self.is_preview:
             self.preview_thread.stop()
             self.view.set_preview(self.DEFAULT_PREVIEW_HOLDER)
+            if self.camera:
+                self.camera.stop()
 
         if self.is_preview and self.currentVideoSource:
             self.preview_thread.start()
+            if self.camera:
+                self.camera.start()
 
     def stop_preview(self):
+        if self.camera:
+            self.camera.stop()
         self.is_preview = False
         self.preview_thread.stop()
         self.view.set_preview(self.DEFAULT_PREVIEW_HOLDER)
@@ -98,11 +115,18 @@ class VideoPreview:
         if self.currentVideoSource:
             self.view.previewstartbutton.setDisabled(False)
             self.preview_thread.setVideoSource(self.currentVideoSource)
+            if isinstance(self.currentVideoSource, QCameraInfo):
+                self._init_camera(self.currentVideoSource)
+                self._init_camera_capture()
+                self.preview_thread.setCameraCapture(self.cameraCapture)
 
     def render_preview(self, image=DEFAULT_PREVIEW_HOLDER): # connect to trigger signal
         assert isinstance(image, QImage)
         if self.is_preview:
             self.view.set_preview(image)
+
+    def render_preview_from_camera(self, data, image):
+        self.render_preview(image)
 
     @staticmethod
     def framerate_to_interval_ms(fps):

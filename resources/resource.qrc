@@ -6,5 +6,8 @@
     <file>images/online.png</file>
     <file>images/create.png</file>
     <file>images/header.png</file>
+    <file>avatar/avatar_0.png</file>
+    <file>avatar/avatar_1.png</file>
+    <file>avatar/avatar_2.png</file>
   </qresource>
 </RCC>

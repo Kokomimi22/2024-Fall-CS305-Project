@@ -1,14 +1,19 @@
+import math
 import sys
 
-from PyQt5.QtCore import Qt, QRectF
+from PyQt5.QtCore import Qt, QRectF, pyqtSignal
 from PyQt5.QtGui import QFont, QColor, QIcon, QImage, QPainter, QPainterPath
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QGridLayout, QFrame, QSizePolicy, \
-    QApplication, QHBoxLayout
+    QApplication, QHBoxLayout, QPushButton, QTextBrowser
 from qfluentwidgets import (CardWidget, HeaderCardWidget, SplitTitleBar, isDarkTheme, CommandBar, Action, FluentIcon,
                             FlyoutViewBase, Slider, CaptionLabel, Flyout, FlyoutAnimationType,
-                            AvatarWidget, SingleDirectionScrollArea, TextEdit, PrimaryToolButton
+                            AvatarWidget, SingleDirectionScrollArea, TextEdit, PrimaryToolButton, TextBrowser,
+                            MessageDialog, MessageBox, RoundMenu, SmoothScrollArea, BodyLabel, PrimaryPushButton,
+                            TransparentToolButton, ToolButton
                             )
 from qfluentwidgets.components.widgets.card_widget import CardSeparator
+from qfluentwidgets.components.widgets.flyout import IconWidget
+from resources import rc
 
 
 def isWin11():
@@ -91,8 +96,7 @@ class ViewWidget(QWidget):
         self.mainLayout.setSpacing(0)
         self.mainLayout.addWidget(self.speakerLabel, 0, Qt.AlignBottom | Qt.AlignRight)
 
-        # self.set_image(QImage(":/images/background.jpg"))
-        self.setSpeaker("ZhiyiYo")
+        self.setSpeaker("Default")
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.init_brush()
 
@@ -242,6 +246,7 @@ class CommandBarCard(CardWidget):
         self.setFixedSize(iw + 15, ih + 10)
 
 class ParticipantCardView(HeaderCardWidget):
+    # TODO: replaced by the camera area card
     def __init__(self, parent=None):
         super().__init__(parent=parent)
 
@@ -256,6 +261,7 @@ class ParticipantCardView(HeaderCardWidget):
         self.participantGrid.setObjectName("ParticipantGrid")
 
         self.scrollView.setWidget(self.participantGrid)
+        self.scrollView.enableTransparentBackground()
 
         self.bodyLayout = QGridLayout(self.participantGrid)
         self.bodyLayout.setContentsMargins(0, 0, 0, 0)
@@ -302,18 +308,45 @@ class ParticipantCardView(HeaderCardWidget):
             """)
 
 class ChatCardView(HeaderCardWidget):
+
+    MAX_MESSAGE = 50
+
     def __init__(self, parent=None):
         super().__init__(parent=parent)
 
         self.setTitle("Chat")
 
-        self.mainLayout = QVBoxLayout(self)
+        self.damakuList = [] # type: list['DamakuWidget']
+
+        self.mainLayout = QVBoxLayout()
         self.mainLayout.setContentsMargins(0, 0, 0, 0)
         self.mainLayout.setSpacing(0)
 
         self.setMinimumSize(260, 400)
         self.viewLayout.setSpacing(0)
         self.viewLayout.setContentsMargins(0, 0, 0, 0)
+
+        self.chatWidget = QWidget()
+        self.chatWidget.setObjectName("ChatWidget")
+        self.chatWidget.setFixedWidth(260)
+        self.chatWidget.setMinimumHeight(50)
+        self.chatWidget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.chatArea = SmoothScrollArea(self)
+        self.chatArea.setWidget(self.chatWidget)
+        self.chatArea.enableTransparentBackground()
+
+        self.chatAreaLayout = QVBoxLayout(self.chatWidget)
+        self.chatAreaLayout.setContentsMargins(0, 0, 0, 0)
+        self.chatAreaLayout.setSpacing(5)
+
+        self.pullDownButton = ToolButton(self)
+        self.pullDownButton.setIcon(FluentIcon.DOWN)
+        self.pullDownButton.setFixedSize(25, 25)
+        self.pullDownButton.move(115, 300)
+        self.pullDownButton.hide()
+
+        self.chatArea.setFixedSize(260, 270)
+        self.mainLayout.addWidget(self.chatArea, alignment=Qt.AlignCenter)
 
         self.bottomLayout = QHBoxLayout()
         self.bottomLayout.setContentsMargins(0, 0, 0, 0)
@@ -324,33 +357,126 @@ class ChatCardView(HeaderCardWidget):
         self.textEdit.setFixedHeight(70)
         self.textEdit.setFixedWidth(200)
 
+        self.textEdit.textChanged.connect(self.handle_text_changed)
+
         self.sendButton = PrimaryToolButton(self)
         self.sendButton.setFixedSize(60, 70)
         self.sendButton.setIcon(FluentIcon.SEND)
+        self.sendButton.setEnabled(False)
 
         self.bottomLayout.addWidget(self.textEdit, alignment=Qt.AlignCenter)
         self.bottomLayout.addWidget(self.sendButton, alignment=Qt.AlignCenter)
 
         self.mainLayout.addStretch(1)
-        self.mainLayout.addWidget(CardSeparator(self))
+        self.separator = CardSeparator(self)
+
+        self.mainLayout.addWidget(self.separator)
         self.mainLayout.addLayout(self.bottomLayout)
 
         self.viewLayout.addLayout(self.mainLayout)
+
+        self.chatArea.verticalScrollBar().valueChanged.connect(self.handle_scroll_up)
+        self.pullDownButton.clicked.connect(self.scroll_to_bottom)
+
+        self.scroll_value_temp = 0
+        self.chatArea_pref_height = 0
     
     def addMessage(self, name, message):
-        pass
+        damaku = self.DamakuWidget(name, message, self)
+        self.chatAreaLayout.addWidget(damaku)
+        self.chatArea_pref_height += damaku.height() + 5
+        self.chatWidget.setFixedHeight(self.chatArea_pref_height)
+        self.damakuList.append(damaku)
+        if self.damakuList.__len__() > self.MAX_MESSAGE:
+            damaku = self.damakuList.pop(0)
+            self.chatAreaLayout.removeWidget(damaku)
+            damaku.deleteLater()
+            self.chatArea_pref_height -= damaku.height() + 5
+            self.chatWidget.setFixedHeight(self.chatArea_pref_height)
+        self.scroll_to_bottom()
+
+    def handle_text_changed(self):
+        text = self.textEdit.toPlainText()
+        if text:
+            self.sendButton.setEnabled(True)
+        else:
+            self.sendButton.setEnabled(False)
+
+    def text_edit_clear(self):
+        self.textEdit.clear()
+        self.sendButton.setEnabled(False)
+
+    def handle_scroll_up(self, cur_val):
+        max_val = self.chatArea.verticalScrollBar().maximum()
+        if cur_val == max_val:
+            self.scroll_value_temp = cur_val
+            self.pullDownButton.hide()
+        elif abs(cur_val - self.scroll_value_temp) > 100:
+            self.scroll_value_temp = cur_val
+            self.pullDownButton.show()
+
+    def scroll_to_bottom(self):
+        self.chatArea.verticalScrollBar().setValue(self.chatArea.verticalScrollBar().maximum())
+
+    class DamakuWidget(QWidget):
+        """
+        A damaku widget that shows single message from the chat
+        """
+        trash_signal = pyqtSignal()
+
+        def __init__(self, name, message, parent=None):
+            super().__init__()
+            self.setFixedWidth(260)
+
+            self.mainLayout = QHBoxLayout(self)
+            self.mainLayout.setContentsMargins(5, 0, 5, 0)
+            self.mainLayout.setSpacing(0)
+
+            self.textDisplay = BodyLabel(self)
+            self.textDisplay.setFixedWidth(250)
+
+            self.mainLayout.addWidget(self.textDisplay, alignment=Qt.AlignCenter)
+
+            # set the style of the text display
+            self.textDisplay.setStyleSheet("""
+                QLabel {
+                    background: transparent;
+                    color: black;
+                }
+                QLabel:hover {
+                    background: rgba(0, 0, 0, 0.1);
+                    }
+            """)
+
+            self.textDisplay.setText(f"<span style='color: #707070; font-weight: 500;'>{name}</span>&nbsp;&nbsp; <span>{message}</span>")
+            self.textDisplay.setMinimumHeight(25)
+            self.textDisplay.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+            self.textDisplay.setWordWrap(True)
+
+            self.roundMenu = RoundMenu(self)
+
+            self.trashAction = Action(FluentIcon.DELETE, 'Delete', triggered=lambda: self.trash_signal.emit())
+            self.copyAction = Action(FluentIcon.COPY, 'Copy', triggered=lambda: self.copy())
+
+            self.setMinimumHeight(25)
+            self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+            self.adjustSize()
+
+
 
 class MeetingInterfaceBase(MeetingWindow):
 
-    close_signal = pyqtSignal(bool)
+    close_signal = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
 
         # set up sub widgets
-        self.title = ""
         self.displayArea = ViewWidget(self)
         self.participantsArea = ParticipantCardView(self)
+        self.participantsArea.addUnit("user1", ":/avatar/avatar_0.png")
+        self.participantsArea.addUnit("user2", ":/avatar/avatar_1.png")
+        self.participantsArea.addUnit("user3", ":/avatar/avatar_2.png")
         self.chatArea = ChatCardView(self)
         self.commandBar = CommandBarCard(FullCommandBar(self))
 
@@ -413,14 +539,31 @@ class MeetingInterfaceBase(MeetingWindow):
         self.mainLayout.addStretch(1)
         self.mainLayout.setSpacing(20)
 
+    def setTitle(self, title):
+        self.titleBar.titleLabel.setText(title)
+        self.titleBar.titleLabel.setStyleSheet("""
+            QLabel{
+                background: transparent;
+                color: black;
+            }
+        """)
 
     def resizeEvent(self, e):
         super().resizeEvent(e)
 
-    def closeEvent(self, e):
-        super().closeEvent(e)
-        self.close_signal.emit(True)
+    def messageBox(self):
+        dialog = MessageBox('Are you sure to leave the meeting?',
+                               '',
+                               parent=self)
+        return dialog
 
+    def closeEvent(self, e):
+        w = self.messageBox()
+        if w.exec():
+            self.close_signal.emit()
+            e.accept()
+        else:
+            e.ignore()
 
 
 

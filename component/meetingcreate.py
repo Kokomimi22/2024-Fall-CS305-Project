@@ -1,13 +1,14 @@
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, QObject
 
 from view.homescreen import HomeInterface, MeetingConfigMessageBox
 
 
-class MeetingCreate:
+class MeetingCreate(QObject):
 
     meeting_created = pyqtSignal(dict) # emit meeting data to home controller
 
     def __init__(self, view: HomeInterface):
+        super().__init__()
         self.view = view
 
         self.view.banner.createButton.clicked.connect(self.handle_create_meeting)
