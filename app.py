@@ -1,44 +1,113 @@
 import sys
+from http.client import responses
 
 from common.conf_client import ConferenceClient
+from common.user import User
 from component.audiopreview import AudioPreview
+from component.meetingcontroller import MeetingController, MeetingType
 from component.meetingcreate import MeetingCreate
 from component.videopreview import VideoPreview
 from view.gui import Main
 from view.gui import LoginWindow
 from view.gui import TestInterface
 
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal, QObject
 from PyQt5.QtGui import QImage
 
 from util import *
+from config import *
 from common.conf_client import ConferenceClient
 import sys
 
 from view.homescreen import HomeInterface
+from view.meetingscreen import MeetingInterfaceBase
 
 conf_client = ConferenceClient()
 
+class AppConfig:
 
-class AppController:
+    _instance = None
 
-    closed = Main.close_signal
-    onNavigateChanged = pyqtSignal(str)
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(AppConfig, cls).__new__(cls)
+            cls._instance.__init__()
+        return cls._instance
+
+    def __init__(self):
+        self.username_cache = None
+        self.password_cache = None
+        # ...
+
+    @classmethod
+    def setUsernameCache(cls, username):
+        cls._instance.username_cache = username
+
+    @classmethod
+    def setPasswordCache(cls, password):
+        cls._instance.password_cache = password
+
+    @classmethod
+    def usernameCache(cls):
+        return cls._instance.username_cache
+
+    @classmethod
+    def passwordCache(cls):
+        return cls._instance.password_cache
+
+    @classmethod
+    def clearCache(cls):
+        cls._instance.username_cache = None
+        cls._instance.password_cache = None
+        # ...
+
+    @classmethod
+    def save(cls):
+        with open(CONFIG_INFO_FILE, 'w') as f:
+            data = {
+                'username': cls._instance.username_cache,
+                'password': cls._instance.password_cache
+            }
+            json.dump(data, f)
+
+    @staticmethod
+    def load():
+        try:
+            with open(CONFIG_INFO_FILE, 'r') as f:
+                data = json.load(f)
+                config = AppConfig()
+                config.username_cache = data.get('username')
+                config.password_cache = data.get('password')
+                return config
+        except FileNotFoundError:
+            print('No config file found, initializing...')
+            return AppConfig()
+
+
+class AppController(QObject):
+
+    closed = pyqtSignal()
 
     def __init__(self, mainui: Main, loginui: LoginWindow):
+        super().__init__()
+        AppConfig.load()
+
         self.mainui = mainui
         self.loginui = loginui
         self.logincontol = LoginController(loginui, self)
         self.testcontrol = TestController(testui=self.mainui.testInterface, app=self)
         self.homecontrol = HomeController(homeui=self.mainui.homeInterface, app=self)
-        self.loginui.close_signal.connect(self.stop)
-        self.mainui.close_signal.connect(self.stop)
+        self.loginui.close_signal.connect(self.closed)
+        self.mainui.close_signal.connect(self.closed)
+        self.closed.connect(self.close)
+
         # initial other controller
+
 
         # connect signal
 
-        # test
-        self.switch_ui('main')
+    def send_text_message(self, message):
+        conf_client.send_message(message)
 
     def switch_ui(self, to='main'):
         if to == 'main':
@@ -54,15 +123,16 @@ class AppController:
         self.logincontol.register_all_action()
         pass
 
-    def stop(self):
-        self.logincontol.stop_thread()
-        QApplication.quit()
+    def close(self):
+        self.mainui.close()
+        self.loginui.close()
 
 class LoginController:
     def __init__(self, loginui: LoginWindow, app: AppController):
         self.loginui = loginui
         self.app = app
         self.isremember = False # load from config
+        self.loadRemember()
 
     def register_all_action(self):
         """
@@ -74,6 +144,7 @@ class LoginController:
         """
         self.loginui.pushButton.clicked.connect(self.login)
         self.loginui.pushButton_3.clicked.connect(self.register)
+        self.loginui.checkBox.stateChanged.connect(self.setRemember)
 
     def login(self):
         username = self.loginui.lineEdit_3.text()
@@ -85,7 +156,7 @@ class LoginController:
         # isRemember = self.loginui.checkBox.isChecked()
         # send login request to server
         server_response = conf_client.login(username, password)
-        if server_response['status'] == Status.SUCCESS:
+        if server_response['status'] == Status.SUCCESS.value:
             self.loginui.info('success', 'Success', 'Login successfully')
             self.remember()
             self.switch_to_main()
@@ -102,10 +173,10 @@ class LoginController:
         # send register request to server
         # login automatically if register success
         register_res = conf_client.register(username, password)
-        if register_res['status'] == Status.SUCCESS:
+        if register_res['status'] == Status.SUCCESS.value:
             self.loginui.info('success', 'Success', 'Register successfully')
             login_res = conf_client.login(username, password)
-            if login_res['status'] == Status.SUCCESS:
+            if login_res['status'] == Status.SUCCESS.value:
                 self.loginui.info('success', 'Success', 'Login successfully')
                 self.remember()
                 self.switch_to_main()
@@ -114,10 +185,19 @@ class LoginController:
         else:
             self.loginui.info('error', 'Error', 'Failed to register')
 
+    def setRemember(self, state):
+        self.isremember = state == 2
+
     def remember(self):
         if self.isremember:
             # save to config
-            pass
+            AppConfig.setUsernameCache(self.loginui.lineEdit_3.text())
+            AppConfig.setPasswordCache(self.loginui.lineEdit_4.text())
+            AppConfig.save()
+
+    def loadRemember(self):
+        self.loginui.lineEdit_3.setText(AppConfig.usernameCache())
+        self.loginui.lineEdit_4.setText(AppConfig.passwordCache())
 
     def switch_to_main(self):
         # switch to main view
@@ -133,6 +213,50 @@ class HomeController:
         self.interface = homeui
         self.app = app
         self.meetingCreateHandler = MeetingCreate(self.interface)
+        self.meetingController = None
+        self.meetingInterface = None
+
+        # connect signal
+        self.meetingCreateHandler.meeting_created.connect(self.handle_meeting_create)
+
+    def handle_meeting_create(self, meeting_data):
+
+        try:
+            response = conf_client.create_conference()
+            if response['status'] == Status.SUCCESS.value:
+                # self.interface.info('success', 'Success', 'Meeting created successfully')
+                self.meetingInterface = MeetingInterfaceBase()
+                self.meetingInterface.setTitle(meeting_data['meeting_name'])
+
+                user_view = conf_client.user()
+                meeting_type = MeetingType.OWNEDSINGLE if meeting_data['meeting_type'] == 'single' else MeetingType.MULTIPLE
+                self.meetingController = MeetingController(self.meetingInterface, self.app, user_view)
+                self._init_signal_connection()
+                self.meetingInterface.show()
+            else:
+                # self.interface.info('error', 'Error', 'Failed to create meeting')
+                pass
+
+        except Exception as e:
+            print(e)
+            # self.interface.info('error', 'Error', 'Failed to create meeting')
+            return
+
+    def _init_signal_connection(self):
+        if self.meetingController:
+            self.meetingController.closed.connect(self.handle_quit)
+            # TODO: connect signal
+            # message_signal.connect(self.meetingController.message_received)
+            # camera_signal.connect(self.meetingController.camera_received)
+            # screen_signal.connect(self.meetingController.screen_received)
+            # audio_signal.connect(self.meetingController.audio_received)
+
+    def handle_quit(self):
+        try:
+            conf_client.quit_conference()
+        except Exception as e:
+            print(e)
+            return
 
 class TestController:
 
@@ -166,3 +290,4 @@ if __name__ == '__main__':
     controller.start()
 
     sys.exit(app.exec_())
+

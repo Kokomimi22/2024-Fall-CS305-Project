@@ -13,6 +13,7 @@ LOG_INTERVAL = 2
 CONTROL_LINE_BUFFER = 1024
 DATA_LINE_BUFFER = 4096
 USER_INFO_FILE = 'user_info.json'
+CONFIG_INFO_FILE = 'config/appconfig.json'
 CHUNK = 4096  # Audio chunk size
 CHANNELS = 1  # Channels for audio capture
 RATE = 44100  # Sampling rate for audio capture

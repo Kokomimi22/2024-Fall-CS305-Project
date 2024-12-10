@@ -13,12 +13,14 @@ AudioPreviewCardView = TestInterface.SoundPreviewCard
 class AudioPreview:
     def __init__(self, view: AudioPreviewCardView):
         # view initialization
+
         self.view = view
 
         # widget initialization
         self.visualizer = view.previewarea.progressSlider
         self.volume_control = view.previewarea.volumeButton
         self.play_control = view.previewarea.playButton
+        self.volume_control.setVolume(100)
 
         # audio input/output initialization
         self.audio_input = None # type: QAudioInput
@@ -34,10 +36,18 @@ class AudioPreview:
         self.play_control.clicked.connect(self.handle_toggle)
         self.view.selecsrcButton.clicked.connect(self.update_available_input)
         self.volume_control.volumeChanged.connect(self.handle_volume_change)
+        self.volume_control.mutedChanged.connect(self.handle_mute_change)
 
         self.play_control.setDisabled(True) # disable play button until audio input is selected
 
         self.cur_volume = 50 # volume when output
+
+    def handle_mute_change(self, muted):
+        self.volume_control.setMuted(muted)
+        if muted:
+            self.handle_volume_change(0)
+        else:
+            self.handle_volume_change(self.cur_volume)
 
     def handle_toggle(self):
         self.play_control.setPlay(not self.is_playing)
@@ -62,6 +72,7 @@ class AudioPreview:
         self.audio_output.stop()
         self.io_device.close()
         self.is_playing = False
+        self.visualizer.setValue(0)
 
 
     def update_available_input(self): # trigger by select source button clicked
@@ -89,7 +100,6 @@ class AudioPreview:
     def handle_volume_change(self, volume): # trigger by volume slider value changed
         self.cur_volume = volume
         self.audio_output.setVolume(volume / 100)
-        print(f'volume changed to {volume}')
 
     def visualize_audio_data(self):
         if self.io_device:

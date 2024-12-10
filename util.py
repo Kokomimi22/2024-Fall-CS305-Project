@@ -28,11 +28,14 @@ QAUDIO_FORMAT.setByteOrder(QAudioFormat.LittleEndian)
 QAUDIO_FORMAT.setSampleType(QAudioFormat.SignedInt)
 
 audio = pyaudio.PyAudio()
-#if audio.get_device_count() == 0: # TODO: remove this in later version
 
-
-streamin = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
-streamout = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=CHUNK)
+try:
+    streamin = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
+    streamout = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=CHUNK)
+except Exception as e:
+    print(e)
+    streamin = None
+    streamout = None
 
 # print warning if no available camera
 cap = cv2.VideoCapture(0)
@@ -137,6 +140,9 @@ def qcapture_audio(audioinput: QAudioInput):
     raise NotImplementedError('qcapture_audio is not implemented yet')
 
 def qcapture_camera(camera: QCamera):
+    img = None
+    def handle_image_capture(data, image):
+        image
     # capture frame of camera
     if camera is None:
         raise Exception('Camera is not available')
@@ -146,9 +152,10 @@ def qcapture_camera(camera: QCamera):
     else:
         image_capture = QCameraImageCapture(camera)
         image_capture.setCaptureDestination(QCameraImageCapture.CaptureToBuffer)
-        image_capture.imageCaptured.connect(lambda d, i: image_capture.stop())
-        image = image_capture.image()
-        return image
+        image_capture.imageCaptured.connect(handle_image_capture)
+        return img
+
+
 
 
 def capture_voice():
