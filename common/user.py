@@ -95,4 +95,4 @@ class UserManager:
 
     def save(self):
         with open(USER_INFO_FILE, 'w') as f:
-            json.dump(self.users, f, default=lambda x: x.__dict__)
+            json.dump(self.users, f, default=lambda x: x.__dict__, indent=4)

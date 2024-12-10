@@ -1,24 +1,17 @@
+import json
 import sys
-from http.client import responses
+
+from PyQt5.QtCore import pyqtSignal, QObject
 
 from common.conf_client import ConferenceClient
-from common.user import User
 from component.audiopreview import AudioPreview
 from component.meetingcontroller import MeetingController, MeetingType
 from component.meetingcreate import MeetingCreate
 from component.videopreview import VideoPreview
-from view.gui import Main
-from view.gui import LoginWindow
-from view.gui import TestInterface
-
-from PyQt5.QtCore import QThread, pyqtSignal, QObject
-from PyQt5.QtGui import QImage
-
-from util import *
 from config import *
-from common.conf_client import ConferenceClient
-import sys
-
+from view.gui import LoginWindow
+from view.gui import Main
+from view.gui import TestInterface
 from view.homescreen import HomeInterface
 from view.meetingscreen import MeetingInterfaceBase
 
@@ -68,7 +61,7 @@ class AppConfig:
                 'username': cls._instance.username_cache,
                 'password': cls._instance.password_cache
             }
-            json.dump(data, f)
+            json.dump(data, f, indent=4)
 
     @staticmethod
     def load():
@@ -131,7 +124,7 @@ class LoginController:
     def __init__(self, loginui: LoginWindow, app: AppController):
         self.loginui = loginui
         self.app = app
-        self.isremember = False # load from config
+        self.isremember = True # load from config
         self.loadRemember()
 
     def register_all_action(self):
@@ -153,7 +146,6 @@ class LoginController:
             # show error message
             self.loginui.info('error', 'Error', 'Username or password is empty')
             return
-        # isRemember = self.loginui.checkBox.isChecked()
         # send login request to server
         server_response = conf_client.login(username, password)
         if server_response['status'] == Status.SUCCESS.value:

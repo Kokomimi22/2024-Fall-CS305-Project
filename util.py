@@ -13,6 +13,7 @@ import numpy as np
 from PIL import Image, ImageGrab
 from PyQt5.QtMultimedia import QCameraInfo, QAudioDeviceInfo, QAudio, QCamera, QCameraImageCapture, QAudioInput, \
     QAudioFormat
+from deprecated.sphinx import deprecated
 
 from config import *
 import uuid
@@ -161,7 +162,7 @@ def qcapture_camera(camera: QCamera):
 def capture_voice():
     raise RuntimeError("This method can't be called currently")
 
-
+@deprecated(version='1.0', reason="This method is deprecated")
 def compress_image(image: Image, format='JPEG', quality=85):
     """
     compress image and output Bytes
@@ -177,7 +178,7 @@ def compress_image(image: Image, format='JPEG', quality=85):
 
     return img_byte_arr
 
-
+@deprecated(version='1.0', reason="This method is deprecated")
 def decompress_image(image_bytes):
     """
     decompress bytes to PIL.Image
