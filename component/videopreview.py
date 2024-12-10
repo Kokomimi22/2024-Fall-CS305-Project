@@ -133,8 +133,9 @@ class VideoPreview:
         return ceil(1000 / fps)
 
 # constansts
-class Desktop:
+class Desktop(QCameraInfo):
     def __init__(self):
+        super().__init__()
         pass
 
     def deviceName(self):

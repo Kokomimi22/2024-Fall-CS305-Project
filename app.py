@@ -229,7 +229,7 @@ class HomeController:
                 self.meetingInterface.setTitle(meeting_data['meeting_name'])
 
                 user_view = conf_client.user()
-                meeting_type = MeetingType.OWNEDSINGLE if meeting_data['meeting_type'] == 'single' else MeetingType.MULTIPLE
+                meeting_type = MeetingType.OWNEDSINGLE if meeting_data['meeting_type'] == 'single' else MeetingType.OWNEDMULTIPUL
                 self.meetingController = MeetingController(self.meetingInterface, self.app, user_view)
                 self._init_signal_connection()
                 self.meetingInterface.show()
