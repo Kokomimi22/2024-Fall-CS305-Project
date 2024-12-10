@@ -1,12 +1,11 @@
-import socket
-import threading
 import json
-import time
+import threading
+
+from DataTransfer.Video.Camera import Camera
 from DataTransfer.Video.VideoReceiver import VideoReceiver
 from DataTransfer.Video.VideoSender import VideoSender
 from common.user import User
 from util import *
-from DataTransfer.Video.Camera import Camera
 
 
 class ConferenceClient:
@@ -278,7 +277,6 @@ class ConferenceClient:
             s = self.command_parser(cmd_input)
             if not s:
                 break
-        print(threading.enumerate())
 
     def register(self, username, password):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
