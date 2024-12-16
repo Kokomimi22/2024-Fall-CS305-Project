@@ -15,7 +15,7 @@ from view.gui import TestInterface
 from view.homescreen import HomeInterface
 from view.meetingscreen import MeetingInterfaceBase
 
-conf_client = ConferenceClient()
+
 
 class AppConfig:
 
@@ -80,6 +80,9 @@ class AppConfig:
 class AppController(QObject):
 
     closed = pyqtSignal()
+    message_received = pyqtSignal(str, str)  # sender_name, message
+    video_received = pyqtSignal(bytes)  # video
+    audio_received = pyqtSignal(bytes)  # audio
 
     def __init__(self, mainui: Main, loginui: LoginWindow):
         super().__init__()
@@ -101,6 +104,27 @@ class AppController(QObject):
 
     def send_text_message(self, message):
         conf_client.send_message(message)
+
+    def send_video_start(self, type='camera'):
+        if type == 'camera':
+            pass
+        elif type == 'screen':
+            pass
+
+    def send_video_stop(self):
+        conf_client.stop_video_sender()
+
+    def send_audio_start(self):
+        # TODO: start AudioSender
+        pass
+
+    def change_audio_volume(self, volume):
+        # TODO: change AudioSender volume
+        pass
+
+    def send_audio_stop(self):
+        # TODO: stop AudioSender
+        pass
 
     def switch_ui(self, to='main'):
         if to == 'main':
@@ -238,10 +262,9 @@ class HomeController:
         if self.meetingController:
             self.meetingController.closed.connect(self.handle_quit)
             # TODO: connect signal
-            # message_signal.connect(self.meetingController.message_received)
-            # camera_signal.connect(self.meetingController.camera_received)
-            # screen_signal.connect(self.meetingController.screen_received)
-            # audio_signal.connect(self.meetingController.audio_received)
+            self.app.message_received.connect(self.meetingController.message_received)
+            self.app.video_received.connect(self.meetingController.video_received)
+            self.app.audio_received.connect(self.meetingController.audio_received)
 
     def handle_quit(self):
         try:
@@ -277,7 +300,7 @@ if __name__ == '__main__':
 
     mainui = Main()
     loginui = LoginWindow()
-    conf_client = ConferenceClient()
+    conf_client = ConferenceClient(AppController)
     controller = AppController(mainui, loginui=loginui)
     controller.start()
 

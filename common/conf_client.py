@@ -9,7 +9,7 @@ from util import *
 
 
 class ConferenceClient:
-    def __init__(self, ):
+    def __init__(self, app_cls=None):
         # sync client
         self.userInfo: User = None
         self.recv_thread: Dict[str, threading.Thread] = {}
@@ -28,7 +28,12 @@ class ConferenceClient:
         self.recv_data = None  # you may need to save received streamd data from other clients in conference
         self.videoSender: VideoSender = None  # you may need to maintain multiple video senders for a single conference
         self.videoReceiver: VideoReceiver = None
-        self.update_handler = {}  # {data_type: handler} for GUI update
+        if isinstance(app_cls, type):
+            self.update_signal = {
+                'text': app_cls.message_received, # type: pyqtSignal(str, str)
+                'video': app_cls.video_received,  # type: pyqtSignal(bytes)
+                'audio': app_cls.audio_received   # type: pyqtSignal(bytes)
+            }  # {data_type: handler} for GUI update
 
     def user(self):
         return self.userInfo
@@ -174,14 +179,26 @@ class ConferenceClient:
                 if _recv_data:
                     try:
                         message = json.loads(_recv_data.decode())
-                        if message['type'] == MessageType.TEXT_MESSAGE.value and self.update_handler.get('text'):
-                            self.update_handler['text'](message)
+                        if message['type'] == MessageType.TEXT_MESSAGE.value and self.update_signal.get('text'):
+                            self.update_signal['text'].emit(message['client_name'], message['message'])
                             print(f'{message["client_name"]}: {message["message"]}')
                     except UnicodeDecodeError:
                         print(f'[Info]: Received data: {len(_recv_data)} bytes')
 
         self.recv_thread['text'] = threading.Thread(target=recv_task)
         self.recv_thread['text'].start()
+
+    def keep_recv_video(self):
+
+        def recv_task():
+            while self.on_meeting:
+                _recv_data = self.videoReceiver.output_image().tobytes()
+                if _recv_data:
+                    self.update_signal['video'].emit(_recv_data)
+                    print(f'[Info]: Received video data: {len(_recv_data)} bytes')
+
+        self.recv_thread['video'] = threading.Thread(target=recv_task)
+        self.recv_thread['video'].start()
 
     def output_data(self):
         """

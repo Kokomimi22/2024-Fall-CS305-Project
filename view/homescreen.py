@@ -1,7 +1,7 @@
 import uuid
 
 from qfluentwidgets import SearchLineEdit, RoundMenu, Action, TitleLabel, SubtitleLabel, ImageLabel, \
-    SingleDirectionScrollArea, FluentIcon, MessageBoxBase, LineEdit, RadioButton, BodyLabel
+    SingleDirectionScrollArea, FluentIcon, MessageBoxBase, LineEdit, RadioButton, BodyLabel, InfoBar, InfoBarPosition
 from PyQt5.QtWidgets import QSpacerItem, QSizePolicy, QWidget, QVBoxLayout, QPushButton, QGraphicsDropShadowEffect, \
     QFrame, QHBoxLayout, QButtonGroup
 from PyQt5.QtGui import QPainter, QPainterPath, QLinearGradient, QBrush, QImage, QIcon, QColor, QDesktopServices
@@ -338,6 +338,53 @@ class HomeInterface(QFrame):
         self.scrollArea.setWidget(view)
         self.scrollArea.setFrameShape(QFrame.NoFrame)
         self.mainLayout.addWidget(self.scrollArea)
+
+    def info(self, info_level, title, msg, pos=InfoBarPosition.TOP, orient=Qt.Orientation.Horizontal):
+        """
+        generate toast-like infobar
+        """
+        if info_level == 'success':
+            InfoBar.success(
+                title=title,
+                content=msg,
+                orient=orient,
+                isClosable=True,
+                duration=3000,
+                position=pos,
+                parent=self
+            )
+        elif info_level == 'warning':
+            InfoBar.warning(
+                title=title,
+                content=msg,
+                orient=orient,
+                isClosable=True,
+                duration=3000,
+                position=pos,
+                parent=self
+            )
+        elif info_level == 'error':
+            InfoBar.error(
+                title=title,
+                content=msg,
+                orient=orient,
+                isClosable=True,
+                duration=3000,
+                position=pos,
+                parent=self
+            )
+        elif info_level == 'info':
+            InfoBar.info(
+                title=title,
+                content=msg,
+                orient=orient,
+                isClosable=True,
+                duration=3000,
+                position=pos,
+                parent=self
+            )
+        else:
+            raise ValueError('Invalid info_level')
 
 class MeetingConfigMessageBox(MessageBoxBase):
     def __init__(self, parent=None):

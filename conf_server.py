@@ -15,7 +15,7 @@ class ConferenceServer:
         self.conference_id: int = conference_id
         self.conf_serve_port: int = conf_serve_port
         self.data_serve_ports = {}
-        self.data_types: List[str] = ['screen', 'camera', 'audio', 'text']
+        self.data_types: List[str] = ['camera', 'audio', 'text']
         self.clients_info = []
         self.client_conns = {}
         # self.clients_addr[datatype][client_id] = addr

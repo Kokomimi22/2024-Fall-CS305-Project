@@ -10,11 +10,8 @@ class MeetingCreate(QObject):
     def __init__(self, view: HomeInterface):
         super().__init__()
         self.view = view
-
         self.view.banner.createButton.clicked.connect(self.handle_create_meeting)
-
         self.form = {}
-
 
     def handle_create_meeting(self):
         mbox = MeetingConfigMessageBox(self.view)
@@ -22,7 +19,6 @@ class MeetingCreate(QObject):
             self.form['meeting_name'] = mbox.meetingName()
             self.form['meeting_type'] = mbox.meetingType()
             self._create_meeting()
-
 
     def _create_meeting(self):
         print('Creating meeting...')

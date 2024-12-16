@@ -80,6 +80,7 @@ def resize_image_to_fit_screen(image, my_screen_size):
     return resized_image
 
 
+#  TODO: override this method
 def overlay_camera_images(camera_images: List[np.array], grid_size=(2, 2)):
     """
     Overlay multiple camera images into a grid.
@@ -129,37 +130,6 @@ def release_camera():
         cap.release()
     # Reinitialize the video capture object
     cap = cv2.VideoCapture(0)
-
-def qcapture_audio(audioinput: QAudioInput):
-    # capture frame of camera
-    if audioinput is None:
-        raise Exception('Audio is not available')
-    elif not audioinput.isAvailable():
-        raise Exception('Audio is not available')
-    elif not audioinput.status() == QAudio.ActiveStatus:
-        raise Exception('Audio is not active')
-    else:
-        pass
-    raise NotImplementedError('qcapture_audio is not implemented yet')
-
-def qcapture_camera(camera: QCamera):
-    img = None
-    def handle_image_capture(data, image):
-        image
-    # capture frame of camera
-    if camera is None:
-        raise Exception('Camera is not available')
-    elif not camera.isAvailable():
-        raise Exception('Camera is not available')
-
-    else:
-        image_capture = QCameraImageCapture(camera)
-        image_capture.setCaptureDestination(QCameraImageCapture.CaptureToBuffer)
-        image_capture.imageCaptured.connect(handle_image_capture)
-        return img
-
-
-
 
 def capture_voice():
     raise RuntimeError("This method can't be called currently")

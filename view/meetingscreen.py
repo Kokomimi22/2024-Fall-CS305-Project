@@ -1,18 +1,21 @@
 import math
 import sys
 
-from PyQt5.QtCore import Qt, QRectF, pyqtSignal
+from PyQt5.QtCore import Qt, QRectF, pyqtSignal, QSize
 from PyQt5.QtGui import QFont, QColor, QIcon, QImage, QPainter, QPainterPath
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QGridLayout, QFrame, QSizePolicy, \
-    QApplication, QHBoxLayout, QPushButton, QTextBrowser
+    QApplication, QHBoxLayout, QPushButton, QTextBrowser, QActionGroup
 from qfluentwidgets import (CardWidget, HeaderCardWidget, SplitTitleBar, isDarkTheme, CommandBar, Action, FluentIcon,
                             FlyoutViewBase, Slider, CaptionLabel, Flyout, FlyoutAnimationType,
                             AvatarWidget, SingleDirectionScrollArea, TextEdit, PrimaryToolButton, TextBrowser,
                             MessageDialog, MessageBox, RoundMenu, SmoothScrollArea, BodyLabel, PrimaryPushButton,
-                            TransparentToolButton, ToolButton
+                            TransparentToolButton, ToolButton, InfoBar, InfoBarPosition, CheckableMenu,
+                            TransparentPushButton, ToolTipFilter
                             )
 from qfluentwidgets.components.widgets.card_widget import CardSeparator
-from qfluentwidgets.components.widgets.flyout import IconWidget
+from qfluentwidgets.components.widgets.flyout import IconWidget, PullUpFlyoutAnimationManager
+from qfluentwidgets.multimedia.media_play_bar import VolumeButton, VolumeView
+
 from resources import rc
 
 
@@ -154,29 +157,58 @@ class ViewWidget(QWidget):
         self.painter.drawImage(self.rect(), self.currentImage)
         self.painter.end()
 
-class VolumeFlyout(FlyoutViewBase):
+class LabelledVolumeButton(TransparentPushButton):
+    """ Volume button """
+
+    volumeChanged = pyqtSignal(int)
+    mutedChanged = pyqtSignal(bool)
+
     def __init__(self, parent=None):
-        super().__init__(parent=parent)
+        super().__init__(parent)
+        self.setText('Volume')
+        self.setFont(QFont('Segoe UI', 9))
+        self.volumeView.volumeLabel.hide()
 
-        self.mainLayout = QVBoxLayout(self)
-        self.mainLayout.setContentsMargins(0, 0, 0, 0)
-        self.mainLayout.setSpacing(0)
+    def _postInit(self):
+        super()._postInit()
+        self.installEventFilter(ToolTipFilter(self, 1000))
+        self.setFixedSize(90, 30)
+        self.setIconSize(QSize(16, 16))
 
-        self.slider = Slider(Qt.Vertical, self)
-        self.slider.setRange(0, 100)
-        self.slider.setValue(50)
+        self.volumeView = VolumeView(self)
+        self.volumeFlyout = Flyout(self.volumeView, self.window(), False)
+        self.setMuted(False)
 
-        self.volHint = CaptionLabel(str(self.slider.value()), self)
-        self.volHint.setAlignment(Qt.AlignCenter)
-        self.mainLayout.addWidget(self.volHint, alignment=Qt.AlignCenter)
+        self.volumeFlyout.hide()
+        self.volumeView.muteButton.clicked.connect(lambda: self.mutedChanged.emit(not self.isMuted))
+        self.volumeView.volumeSlider.valueChanged.connect(self.volumeChanged)
+        self.clicked.connect(self._showVolumeFlyout)
 
-        self.mainLayout.addWidget(self.slider, alignment=Qt.AlignCenter)
-        self.setFixedSize(50, 120)
+    def setMuted(self, isMute: bool):
+        self.isMuted = isMute
+        self.volumeView.setMuted(isMute)
 
+        if isMute:
+            self.setIcon(FluentIcon.MUTE)
+        else:
+            self.setIcon(FluentIcon.VOLUME)
 
+    def setVolume(self, volume: int):
+        self.volumeView.setVolume(volume)
+
+    def _showVolumeFlyout(self):
+        if self.volumeFlyout.isVisible():
+            return
+
+        pos = PullUpFlyoutAnimationManager(self.volumeFlyout).position(self)
+        self.volumeFlyout.exec(pos)
 
 
 class FullCommandBar(CommandBar):
+
+    share_signal = pyqtSignal(str)
+    speak_signal = pyqtSignal(bool)
+
     def __init__(self, parent=None):
         super().__init__(parent=parent)
 
@@ -185,9 +217,10 @@ class FullCommandBar(CommandBar):
         self.addActions([
             Action(FluentIcon.SHARE, 'Share', triggered=self.share),
             Action(FluentIcon.MICROPHONE, 'Speak', triggered=self.speak),
-            Action(FluentIcon.MUTE, 'Mute', triggered=self.mute),
-            Action(FluentIcon.VOLUME, 'Volume', triggered=self.volume)
         ])
+        self.addWidget(LabelledVolumeButton())
+
+        self.share_menu = CheckableMenu(self)
 
         self.addSeparator()
 
@@ -197,6 +230,14 @@ class FullCommandBar(CommandBar):
         ])
 
         self.resizeToSuitableWidth()
+
+    def _init_share_menu(self):
+        actionGroup = QActionGroup(self)
+        self.share_menu.addActions([
+            Action(text='Don\'t Share', triggered=lambda : self.share_signal.emit('stop'), actionGroup=actionGroup, checkable=True),
+            Action(icon=FluentIcon.FULL_SCREEN, text='Screen', triggered=lambda : self.share_signal.emit('screen'),actionGroup=actionGroup, checkable=True),
+            Action(icon=FluentIcon.CAMERA, text='Camera', triggered=lambda : self.share_signal.emit('camera'),actionGroup=actionGroup, checkable=True),
+        ])
 
     def getAction(self, key):
         """
@@ -216,13 +257,7 @@ class FullCommandBar(CommandBar):
         pass
 
     def volume(self):
-        flyout = VolumeFlyout(self)
-        Flyout.make(
-            flyout,
-            self,
-            self,
-            aniType=FlyoutAnimationType.PULL_UP
-        )
+        pass
 
     def leave(self):
         pass
@@ -448,7 +483,7 @@ class ChatCardView(HeaderCardWidget):
                     }
             """)
 
-            self.textDisplay.setText(f"<span style='color: #707070; font-weight: 500;'>{name}</span>&nbsp;&nbsp; <span>{message}</span>")
+            self.textDisplay.setText(f"<span style='color: #707070; font-weight: 500;'>{name}</span>&nbsp;&nbsp; <span>{self.convert_plain_text(message)}</span>")
             self.textDisplay.setMinimumHeight(25)
             self.textDisplay.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
             self.textDisplay.setWordWrap(True)
@@ -462,6 +497,13 @@ class ChatCardView(HeaderCardWidget):
             self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
             self.adjustSize()
 
+
+        @staticmethod
+        def convert_plain_text(text):
+            """
+            convert '\n' to '<br />' in plain text
+            """
+            return text.replace('\n', '<br />')
 
 
 class MeetingInterfaceBase(MeetingWindow):
@@ -564,6 +606,53 @@ class MeetingInterfaceBase(MeetingWindow):
             e.accept()
         else:
             e.ignore()
+
+    def info(self, info_level, title, msg, pos=InfoBarPosition.TOP, orient=Qt.Orientation.Horizontal):
+        """
+        generate toast-like infobar
+        """
+        if info_level == 'success':
+            InfoBar.success(
+                title=title,
+                content=msg,
+                orient=orient,
+                isClosable=True,
+                duration=3000,
+                position=pos,
+                parent=self
+            )
+        elif info_level == 'warning':
+            InfoBar.warning(
+                title=title,
+                content=msg,
+                orient=orient,
+                isClosable=True,
+                duration=3000,
+                position=pos,
+                parent=self
+            )
+        elif info_level == 'error':
+            InfoBar.error(
+                title=title,
+                content=msg,
+                orient=orient,
+                isClosable=True,
+                duration=3000,
+                position=pos,
+                parent=self
+            )
+        elif info_level == 'info':
+            InfoBar.info(
+                title=title,
+                content=msg,
+                orient=orient,
+                isClosable=True,
+                duration=3000,
+                position=pos,
+                parent=self
+            )
+        else:
+            raise ValueError('Invalid info_level')
 
 
 

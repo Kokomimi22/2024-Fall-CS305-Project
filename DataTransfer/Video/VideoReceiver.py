@@ -20,6 +20,7 @@ class VideoReceiver:
         self.received_chunks = {}  # Dictionary to store received chunks for each client
         self.frames = {}  # Dictionary to store last frames for each client
         self._running = False
+        self.gridimage_queue = [] # lifo queue for grid images
 
     @staticmethod
     def _unpack_data(data):
@@ -80,12 +81,20 @@ class VideoReceiver:
             grid_size = int(math.ceil(math.sqrt(len(camera_images))))
             # Overlay the camera images in a grid using the overlay_camera_images function in **util.py**
             grid_image = overlay_camera_images(camera_images, (grid_size, grid_size))
+            self.enqueue_image(grid_image)
             cv2.imshow('Video Grid', grid_image)
             # Clear the buffer for next frame
             self.buffers[client_id] = b''
             self.expected_sequences[client_id] = 0
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
+
+    def enqueue_image(self, grid_image):
+        self.gridimage_queue.append(grid_image)
+
+    def output_image(self):
+        if self.gridimage_queue:
+            return self.gridimage_queue.pop()
 
     def remove_client(self, client_id):
         self.buffers.pop(client_id, None)

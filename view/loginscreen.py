@@ -115,6 +115,7 @@ class LoginWindow(Window, Ui_Form):
             )
         else:
             raise ValueError('Invalid info_level')
+
 if __name__ == '__main__':
     pass
 
