@@ -20,7 +20,6 @@ class VideoReceiver:
         self.received_chunks = {}  # Dictionary to store received chunks for each client
         self.frames = {}  # Dictionary to store last frames for each client
         self._running = False
-        self._thread = None
 
     @staticmethod
     def _unpack_data(data):
@@ -36,7 +35,8 @@ class VideoReceiver:
         chunk_data = data[offset:]
         return client_id, data_len, sequence_number, chunk_data
 
-    def process_data(self):
+    def start(self):
+        self._running = True
         while self._running:
             try:
                 data, _ = self.sock.recvfrom(65536)
@@ -103,11 +103,5 @@ class VideoReceiver:
 
     def terminate(self):
         self._running = False
-        self._thread.join()
         cv2.destroyAllWindows()
         self.clear()
-
-    def start(self):
-        self._running = True
-        self._thread = threading.Thread(target=self.process_data)
-        self._thread.start()

@@ -127,6 +127,8 @@ def release_camera():
     global cap
     if cap.isOpened():
         cap.release()
+    # Reinitialize the video capture object
+    cap = cv2.VideoCapture(0)
 
 def qcapture_audio(audioinput: QAudioInput):
     # capture frame of camera

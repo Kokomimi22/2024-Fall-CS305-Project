@@ -225,12 +225,14 @@ class ConferenceClient:
             try:
                 if self.videoSender:
                     self.videoSender.terminate()
+                for recv_thread in self.recv_thread.values():
+                    if recv_thread is not threading.current_thread():
+                        recv_thread.join()
                 if self.videoReceiver:
                     self.videoReceiver.terminate()
-                for recv_thread in self.recv_thread.values():
-                    recv_thread.join()
                 for send_thread in self.send_thread.values():
-                    send_thread.join()
+                    if send_thread is not threading.current_thread():
+                        send_thread.join()
                 for conn in self.conns.values():
                     conn.shutdown(socket.SHUT_RDWR)
             except socket.error as e:
@@ -254,6 +256,7 @@ class ConferenceClient:
             camera = Camera()
             self.videoSender = VideoSender(camera, self.conns['camera'], self.userInfo.uuid)
         self.send_thread['camera'] = threading.Thread(target=self.videoSender.start)
+        self.send_thread['camera'].start()
 
     def stop_video_sender(self):
         """
@@ -312,7 +315,7 @@ class ConferenceClient:
     def logout(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
-            message = json.dumps({'type': MessageType.LOGOUT.value, 'uuid': self.userInfo.uuid})
+            message = json.dumps({'type': MessageType.LOGOUT.value, 'client_id': self.userInfo.uuid})
             s.sendall(message.encode())
             recv_data = s.recv(CONTROL_LINE_BUFFER).decode('utf-8')
             response = json.loads(recv_data)
