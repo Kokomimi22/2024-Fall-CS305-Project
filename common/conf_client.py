@@ -13,6 +13,7 @@ class ConferenceClient:
         # sync client
         self.userInfo: User = None
         self.recv_thread: Dict[str, threading.Thread] = {}
+        self.send_thread: Dict[str, threading.Thread] = {}
         self.is_working = True
         self.conf_server_addr = None  # conference server addr
         self.data_server_addr: Dict[str, Any] = None  # data server in the conference server
@@ -22,7 +23,6 @@ class ConferenceClient:
                                    'text']  # the data types that can be shared, which should be modified
         self.share_data = {}
         self.sharing_task = None
-
         self.conference_info = None  # you may need to save and update some conference_info regularly
         self.conference_id = None  # conference_id for distinguish difference conference
         self.recv_data = None  # you may need to save received streamd data from other clients in conference
@@ -227,6 +227,10 @@ class ConferenceClient:
                     self.videoSender.terminate()
                 if self.videoReceiver:
                     self.videoReceiver.terminate()
+                for recv_thread in self.recv_thread.values():
+                    recv_thread.join()
+                for send_thread in self.send_thread.values():
+                    send_thread.join()
                 for conn in self.conns.values():
                     conn.shutdown(socket.SHUT_RDWR)
             except socket.error as e:
@@ -246,20 +250,19 @@ class ConferenceClient:
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
             return
-        if self.videoSender:
-            self.videoSender.start()
-        else:
+        if not self.videoSender:
             camera = Camera()
             self.videoSender = VideoSender(camera, self.conns['camera'], self.userInfo.uuid)
-            threading.Thread(target=self.videoSender.start).start()
+        self.send_thread['camera'] = threading.Thread(target=self.videoSender.start)
 
     def stop_video_sender(self):
         """
         stop video sender for sharing camera data
         """
         if self.videoSender:
-            self.videoSender.stop()
+            self.videoSender.terminate()
             self.videoSender = None
+            self.send_thread['camera'].join()
         else:
             print(f'[Error]: Video sender is not started')
 
@@ -274,8 +277,8 @@ class ConferenceClient:
                 status = f'OnMeeting-{self.conference_id}'
 
             cmd_input = input(f'({status}) Please enter a operation (enter "?" to help): ')
-            s = self.command_parser(cmd_input)
-            if not s:
+            continue_flag = self.command_parser(cmd_input)
+            if not continue_flag:
                 break
 
     def register(self, username, password):

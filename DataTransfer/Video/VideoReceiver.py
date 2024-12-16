@@ -39,7 +39,7 @@ class VideoReceiver:
     def process_data(self):
         while self._running:
             try:
-                data, _ = self.sock.recvfrom(10**6)
+                data, _ = self.sock.recvfrom(65536)
                 if data == b'Cancelled':
                     break
             except BlockingIOError:
