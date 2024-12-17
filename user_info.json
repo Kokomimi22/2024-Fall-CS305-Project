@@ -1,0 +1,44 @@
+{
+  "7521": {
+    "username": "abc",
+    "password": "123",
+    "uuid": "7521",
+    "addr": null,
+    "is_active": false
+  },
+  "7234": {
+    "username": "abcd",
+    "password": "123",
+    "uuid": "7234",
+    "addr": null,
+    "is_active": false
+  },
+  "17c1a1f7ef7d43f3": {
+    "username": "abc",
+    "password": "123",
+    "uuid": "17c1a1f7ef7d43f3",
+    "addr": null,
+    "is_active": false
+  },
+  "b3ff8121f3784073": {
+    "username": "yhg",
+    "password": "123",
+    "uuid": "b3ff8121f3784073",
+    "addr": null,
+    "is_active": false
+  },
+  "e0afbfc9bda146ad": {
+    "username": "user7",
+    "password": "123",
+    "uuid": "e0afbfc9bda146ad",
+    "addr": null,
+    "is_active": false
+  },
+  "2772064588b24e88": {
+    "username": "abcd",
+    "password": "123",
+    "uuid": "2772064588b24e88",
+    "addr": null,
+    "is_active": false
+  }
+}
