@@ -10,11 +10,12 @@ from qfluentwidgets import (CardWidget, HeaderCardWidget, SplitTitleBar, isDarkT
                             AvatarWidget, SingleDirectionScrollArea, TextEdit, PrimaryToolButton, TextBrowser,
                             MessageDialog, MessageBox, RoundMenu, SmoothScrollArea, BodyLabel, PrimaryPushButton,
                             TransparentToolButton, ToolButton, InfoBar, InfoBarPosition, CheckableMenu,
-                            TransparentPushButton, ToolTipFilter
+                            TransparentPushButton, ToolTipFilter, MenuIndicatorType, TransparentDropDownPushButton
                             )
 from qfluentwidgets.components.widgets.card_widget import CardSeparator
 from qfluentwidgets.components.widgets.flyout import IconWidget, PullUpFlyoutAnimationManager
 from qfluentwidgets.multimedia.media_play_bar import VolumeButton, VolumeView
+from typing_extensions import override, overload
 
 from resources import rc
 
@@ -214,13 +215,21 @@ class FullCommandBar(CommandBar):
 
         self.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
+        self.share_action = TransparentDropDownPushButton(FluentIcon.SHARE, 'Share')
+        self.share_action.setFixedSize(100, 30)
+        self.share_action.setFont(QFont('Segoe UI', 9))
+        self.speak_action = Action(FluentIcon.MICROPHONE, 'Speak')
+
+        self.addWidget(self.share_action)
         self.addActions([
-            Action(FluentIcon.SHARE, 'Share', triggered=self.share),
-            Action(FluentIcon.MICROPHONE, 'Speak', triggered=self.speak),
+            self.speak_action,
         ])
+
         self.addWidget(LabelledVolumeButton())
 
-        self.share_menu = CheckableMenu(self)
+        self.share_menu = CheckableMenu(self, indicatorType=MenuIndicatorType.RADIO)
+        self._init_share_menu()
+        self.share_action.setMenu(self.share_menu)
 
         self.addSeparator()
 
@@ -233,11 +242,25 @@ class FullCommandBar(CommandBar):
 
     def _init_share_menu(self):
         actionGroup = QActionGroup(self)
+        actionGroup.setExclusive(True)
+
+        action1 = Action(FluentIcon.PAUSE, 'Don\'t Share', triggered=lambda : self.share_signal.emit('stop'), checkable=True)
+        action2 = Action(FluentIcon.VIDEO, 'Screen', triggered=lambda : self.share_signal.emit('screen'), checkable=True)
+        action3 = Action(FluentIcon.CAMERA, 'Camera', triggered=lambda : self.share_signal.emit('camera'), checkable=True)
+        actionGroup.addAction(action1)
+        actionGroup.addAction(action2)
+        actionGroup.addAction(action3)
+
         self.share_menu.addActions([
-            Action(text='Don\'t Share', triggered=lambda : self.share_signal.emit('stop'), actionGroup=actionGroup, checkable=True),
-            Action(icon=FluentIcon.FULL_SCREEN, text='Screen', triggered=lambda : self.share_signal.emit('screen'),actionGroup=actionGroup, checkable=True),
-            Action(icon=FluentIcon.CAMERA, text='Camera', triggered=lambda : self.share_signal.emit('camera'),actionGroup=actionGroup, checkable=True),
+            action1, action2, action3
         ])
+
+        action1.setChecked(True)
+
+    def share_menu_event(self, checked):
+        if checked:
+            pos = self.mapToGlobal(self.sender().pos())
+            self.share_menu.exec(pos)
 
     def getAction(self, key):
         """
@@ -246,6 +269,12 @@ class FullCommandBar(CommandBar):
         for action in self.actions():
             if action.text() == key:
                 return action
+
+    def removeActionByKey(self, key: str):
+        action = self.getAction(key)
+        if action:
+            self.removeAction(action)
+        self.resizeToSuitableWidth()
 
     def share(self):
         pass
@@ -278,6 +307,14 @@ class CommandBarCard(CardWidget):
         self.mainLayout.addWidget(self.commandBar, alignment=Qt.AlignCenter)
         iw, ih = self.commandBar.width(), self.commandBar.height()
 
+        self.setFixedSize(iw + 15, ih + 10)
+
+    def getCommandBar(self):
+        return self.commandBar
+
+    def removeActionByKey(self, key: str):
+        self.commandBar.removeActionByKey(key)
+        iw, ih = self.commandBar.width(), self.commandBar.height()
         self.setFixedSize(iw + 15, ih + 10)
 
 class ParticipantCardView(HeaderCardWidget):
@@ -654,7 +691,13 @@ class MeetingInterfaceBase(MeetingWindow):
         else:
             raise ValueError('Invalid info_level')
 
-
+class SimpleMeetingInterface(MeetingInterfaceBase):
+    """
+    Meeting interface for single type meeting (non-owned single type)
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.commandBar.removeActionByKey('Cancel')
 
 if __name__ == "__main__":
     QApplication.setHighDpiScaleFactorRoundingPolicy(

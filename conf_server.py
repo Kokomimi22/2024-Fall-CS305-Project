@@ -89,8 +89,7 @@ class ConferenceServer:
 
     async def handle_video(self, data, addr):
         for client_addr in self.clients_addr['camera'].values():
-            if client_addr != addr:
-                self.transport['camera'].sendto(data, client_addr)
+            self.transport['camera'].sendto(data, client_addr)
 
     async def log(self):
         try:

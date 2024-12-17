@@ -33,6 +33,7 @@ class MeetingController(QObject):
 
         # connect signal
         self.meetingUI.close_signal.connect(self.closed)
+        self.meetingUI.commandBar.getCommandBar().share_signal.connect(self.handle_video_send)
         self.chatArea.sendButton.clicked.connect(self.handle_message_send)
         self.message_received.connect(self.handle_message)
         self.video_received.connect(self.handle_video)
@@ -42,14 +43,13 @@ class MeetingController(QObject):
         self.chatArea.textEdit.clear()
         self.message_received.emit(self.user_view.username, message)
 
-    def handle_screen_send(self, ):
-        self.app.send_video_start('screen')
-
-    def handle_camera_send(self, ):
-        self.app.send_video_start('camera')
+    def handle_video_send(self, str):
+        self.app.send_video_start(str)
+        print("video send", str)
 
     def handle_video_stop(self, ):
         self.app.send_video_stop()
+        print("video stop")
 
     def handle_audio(self, user_id, audio: bytes):
         # TODO play audio

@@ -41,6 +41,10 @@ def main():
     sender2_thread.join()
     sender3_thread.join()
     receiver_thread.join()
+    socket_connection.close()
+    socket1.close()
+    socket2.close()
+    socket3.close()
 
 if __name__ == "__main__":
     main()

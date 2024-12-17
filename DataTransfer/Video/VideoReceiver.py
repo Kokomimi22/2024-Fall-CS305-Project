@@ -112,5 +112,4 @@ class VideoReceiver:
 
     def terminate(self):
         self._running = False
-        cv2.destroyAllWindows()
         self.clear()
