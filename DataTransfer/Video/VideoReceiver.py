@@ -1,4 +1,5 @@
 import math
+import queue
 import socket
 import struct
 
@@ -21,6 +22,7 @@ class VideoReceiver:
         self._running = False
         # 用于存储解码器的字典
         self.decoders: Dict[str,  av.codec.context.CodecContext] = {}
+        self.gridimage_queue = queue.Queue()  #线程安全队列
 
     @staticmethod
     def _unpack_data(data):
@@ -101,6 +103,7 @@ class VideoReceiver:
                         if camera_images:
                             grid_size = int(math.ceil(math.sqrt(len(camera_images))))
                             grid_image = overlay_camera_images(camera_images, (grid_size, grid_size))
+                            self.gridimage_queue.put(grid_image)
                             cv2.imshow('Video Grid', grid_image)
 
                             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -114,8 +117,7 @@ class VideoReceiver:
             self.expected_sequences[client_id] = 0
 
     def remove_client(self, client_id):
-        if client_id in self.decoders:
-            del self.decoders[client_id]
+        self.decoders.pop(client_id, None)
         self.buffers.pop(client_id, None)
         self.expected_sequences.pop(client_id, None)
         self.received_chunks.pop(client_id, None)
@@ -123,12 +125,17 @@ class VideoReceiver:
         if not self.frames:
             cv2.destroyAllWindows()
 
+    def output_image(self):
+        if not self.gridimage_queue.empty():
+            return self.gridimage_queue.get()
+
     def clear(self):
         self.decoders.clear()
         self.buffers.clear()
         self.expected_sequences.clear()
         self.received_chunks.clear()
         self.frames.clear()
+
     def terminate(self):
         self._running = False
         cv2.destroyAllWindows()

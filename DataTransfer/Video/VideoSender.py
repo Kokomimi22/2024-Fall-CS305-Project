@@ -59,7 +59,7 @@ class VideoSender:
                 # 编码帧
                 # encode似乎来自C扩展，PyCharm似乎无法识别，别在意这个警告
                 packets = self.codec_context.encode(av_frame)
-
+                # 一个packets里只有一帧数据
                 for packet in packets:
                     # 获取编码后的数据
                     encoded_data = bytes(packet)
