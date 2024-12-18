@@ -42,8 +42,12 @@ class ClientCLI:
             elif cmd_input == 'exit':
                 if self.client.on_meeting:
                     self.client.quit_conference()
-                    self.client.logout()
+                self.client.logout()
                 return False
+            elif cmd_input == 'logout':
+                if self.client.on_meeting:
+                    self.client.quit_conference()
+                self.client.logout()
             elif cmd_input == 'get_conferences':
                 self.client.get_conference_list()
             elif cmd_input == 'switch_video_mode':

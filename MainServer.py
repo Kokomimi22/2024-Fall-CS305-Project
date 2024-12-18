@@ -89,17 +89,22 @@ class MainServer:
         """
         login an existing user
         """
-        # 读取json文件，查找是否有对应的用户名和密码
+        # 读取json文件，查找是否有对应的用户名和密码, 并且检查是否已经登录以及是否正确
         _user = self.user_manager.login(username, password)
-        if _user:
-            uuid = _user.uuid
+        if _user == User("1"):
             return {
-                'status': Status.SUCCESS.value,
-                'uuid': uuid
+                'status': Status.FAILED.value,
+                'message': 'User already logged in'
             }
+        if _user == User("2"):
+            return {
+                'status': Status.FAILED.value,
+                'message': 'Username or password are incorrect'
+            }
+        uuid = _user.uuid
         return {
-            'status': Status.FAILED.value,
-            'message': 'Username or password are incorrect'
+            'status': Status.SUCCESS.value,
+            'uuid': uuid
         }
 
     def handle_logout(self, uuid):
