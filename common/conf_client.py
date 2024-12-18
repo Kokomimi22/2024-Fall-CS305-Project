@@ -30,9 +30,9 @@ class ConferenceClient:
         self.videoReceiver: VideoReceiver = None
         if isinstance(app_cls, type):
             self.update_signal = {
-                'text': app_cls.message_received, # type: pyqtSignal(str, str)
+                'text': app_cls.message_received,  # type: pyqtSignal(str, str)
                 'video': app_cls.video_received,  # type: pyqtSignal(bytes)
-                'audio': app_cls.audio_received   # type: pyqtSignal(bytes)
+                'audio': app_cls.audio_received  # type: pyqtSignal(bytes)
             }  # {data_type: handler} for GUI update
 
     def user(self):
@@ -78,7 +78,7 @@ class ConferenceClient:
             s.sendall(json.dumps(create_request).encode())
             recv_data: Dict[str, Any] = json.loads(s.recv(CONTROL_LINE_BUFFER).decode('utf-8'))
             if recv_data['status'] == Status.SUCCESS.value:
-                #成功了就加入会议
+                # 成功了就加入会议
                 self.join_conference(recv_data['conference_id'])
                 print(f'[Info]: Created conference {self.conference_id} successfully')
             else:
@@ -168,7 +168,6 @@ class ConferenceClient:
         running task: keep receiving certain type of data (save or output)
         you can create other functions for receiving various kinds of data
         """
-
         def recv_task():
             while self.on_meeting:
                 _recv_data = recv_conn.recv(DATA_LINE_BUFFER)
@@ -189,7 +188,9 @@ class ConferenceClient:
         self.recv_thread['text'].start()
 
     def keep_recv_video(self):
-
+        """
+        running task: keep receiving video data
+        """
         def recv_task():
             while self.on_meeting:
                 _recv_data = self.videoReceiver.output_image().tobytes()
@@ -229,8 +230,7 @@ class ConferenceClient:
         self.conns['camera'].sendall(json.dumps(init_request).encode())
         self.videoReceiver = VideoReceiver(self.conns['camera'])
         # start receiving video data
-        self.recv_thread['camera'] = threading.Thread(target=self.videoReceiver.start)
-        self.recv_thread['camera'].start()
+        self.videoReceiver.start()
 
     def close_conference(self):
         """
@@ -263,6 +263,15 @@ class ConferenceClient:
                 except socket.error as e:
                     print(f"[Error]: Error closing connection: {e}")
 
+    def switch_video_mode(self):
+        """
+        switch video mode between camera and screen
+        """
+        if not self.videoSender:
+            print(f'[Error]: Video sender is not started')
+            return
+        self.videoSender.switch_mode()
+
     def start_video_sender(self, mode='camera'):
         """
         start video sender for sharing camera data
@@ -270,14 +279,14 @@ class ConferenceClient:
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
             return
-        if not self.videoSender:
-            camera = Camera(mode)
-            self.videoSender = VideoSender(camera, self.conns['camera'], self.userInfo.uuid)
-            print(f'[Info]: Start video sender in {mode} mode')
-        else:
-            self.videoSender.switch_mode()
-        self.send_thread['camera'] = threading.Thread(target=self.videoSender.start)
-        self.send_thread['camera'].start()
+        if self.videoSender:
+            print(f'[Error]: Video sender is already started' +
+                  'I guess you want to switch video mode, please use switch_video_mode command')
+            return
+        camera = Camera(mode)
+        self.videoSender = VideoSender(camera, self.conns['camera'], self.userInfo.uuid)
+        print(f'[Info]: Start video sender in {mode} mode')
+        self.videoSender.start()
 
     def stop_video_sender(self):
         """
@@ -286,7 +295,6 @@ class ConferenceClient:
         if self.videoSender:
             self.videoSender.terminate()
             self.videoSender = None
-            self.send_thread['camera'].join()
         else:
             print(f'[Error]: Video sender is not started')
 
@@ -331,5 +339,3 @@ class ConferenceClient:
             else:
                 print(f"[Error]: {response['message']}")
             return response
-
-

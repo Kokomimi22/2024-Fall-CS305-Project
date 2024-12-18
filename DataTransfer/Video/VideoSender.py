@@ -1,5 +1,6 @@
 import io
 import struct
+import threading
 import time
 
 import av
@@ -15,7 +16,7 @@ class VideoSender:
         self.frame_rate = frame_rate
         self.sock = socket_connection
         self._running = False
-
+        self._thread = None
         # 初始化编码器
         self.codec_context = self._create_codec_context()
 
@@ -42,10 +43,8 @@ class VideoSender:
         }
         return stream
 
-    def start(self):
-        self._running = True
+    def _process_data(self):
         client_id_len = len(self.client_id)
-
         while self._running:
             ret, frame = self.camera.get_frame()
             if not ret:
@@ -85,8 +84,16 @@ class VideoSender:
             # 控制帧率
             time.sleep(1.0 / self.frame_rate)
 
+    def start(self):
+        if self._running:
+            raise RuntimeError("VideoSender is already running")
+        self._running = True
+        self._thread = threading.Thread(target=self._process_data)
+        self._thread.start()
+
     def stop(self):
         self._running = False
+        self._thread.join()
         # 刷新编码器缓冲区
         if self.codec_context:
             try:

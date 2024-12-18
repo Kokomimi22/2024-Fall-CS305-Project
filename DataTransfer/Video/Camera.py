@@ -23,11 +23,21 @@ class Camera:
                 self.frame = (ret, frame)
 
     def get_frame(self):
+        """
+        get the current frame and thread safe
+        """
         with self.lock:
             return self.frame
 
     def switch_mode(self):
-        self.mode = 'camera' if self.mode == 'screen' else 'screen'
+        """
+        switch between camera and screen
+        """
+        if self.mode == 'camera':
+           self.mode = 'screen'
+           release_camera()
+        else:
+            self.mode = 'camera'
 
     def stop(self):
         if self.running:

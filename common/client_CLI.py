@@ -46,6 +46,8 @@ class ClientCLI:
                 return False
             elif cmd_input == 'get_conferences':
                 self.client.get_conference_list()
+            elif cmd_input == 'switch_video_mode':
+                self.client.switch_video_mode()
             else:
                 print('[Error]: Invalid command' + '\r\n' + HELP)
         elif len(fields) == 2:
