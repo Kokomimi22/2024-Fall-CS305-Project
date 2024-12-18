@@ -137,5 +137,7 @@ class VideoReceiver:
         self.frames.clear()
 
     def terminate(self):
+        if not self._running:
+            return
         self._running = False
         self.clear()

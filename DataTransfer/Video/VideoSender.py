@@ -99,6 +99,8 @@ class VideoSender:
         self.camera.stop()
 
     def terminate(self):
+        if not self._running:
+            return
         self.stop()
         terminate_signal = (struct.pack("I", len(self.client_id)) +
                             self.client_id +
