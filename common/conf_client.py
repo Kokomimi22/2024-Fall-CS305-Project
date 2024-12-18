@@ -242,6 +242,7 @@ class ConferenceClient:
             try:
                 if self.videoSender:
                     self.videoSender.terminate()
+                    self.videoSender = None
                 for recv_thread in self.recv_thread.values():
                     if recv_thread is not threading.current_thread():
                         recv_thread.join()
@@ -262,7 +263,7 @@ class ConferenceClient:
                 except socket.error as e:
                     print(f"[Error]: Error closing connection: {e}")
 
-    def start_video_sender(self):
+    def start_video_sender(self, mode='camera'):
         """
         start video sender for sharing camera data
         """
@@ -270,8 +271,11 @@ class ConferenceClient:
             print(f'[Error]: You are not in a conference')
             return
         if not self.videoSender:
-            camera = Camera()
+            camera = Camera(mode)
             self.videoSender = VideoSender(camera, self.conns['camera'], self.userInfo.uuid)
+            print(f'[Info]: Start video sender in {mode} mode')
+        else:
+            self.videoSender.switch_mode()
         self.send_thread['camera'] = threading.Thread(target=self.videoSender.start)
         self.send_thread['camera'].start()
 

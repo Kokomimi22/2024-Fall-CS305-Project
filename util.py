@@ -111,11 +111,20 @@ def overlay_camera_images(camera_images: List[np.array], grid_size=(2, 2)):
     return grid_image
 
 def capture_screen():
-    # capture screen with the resolution of display
-    # img = pyautogui.screenshot()
-    img = ImageGrab.grab()
-    return img
+    try:
+        # Capture the screen using PIL's ImageGrab
+        screenshot = ImageGrab.grab()
 
+        # Convert the screenshot to a numpy array
+        frame = np.array(screenshot)
+
+        # Convert the color space from RGB to BGR (which OpenCV uses)
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+        return True, frame
+    except Exception as e:
+        print(f"Failed to capture screen: {e}")
+        return False, None
 
 def capture_camera()->np.array:
     # capture frame of camera

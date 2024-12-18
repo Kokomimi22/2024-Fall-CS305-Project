@@ -54,11 +54,13 @@ class ClientCLI:
                 self.client.join_conference(int(arg))
             elif fields[0] == 'on':
                 if arg == 'camera':
-                    self.client.start_video_sender()
+                    self.client.start_video_sender('camera')
+                elif arg == 'screen':
+                    self.client.start_video_sender('screen')
                 else:
                     print('[Error]: Invalid command' + '\r\n' + HELP)
             elif fields[0] == 'off':
-                if arg == 'camera':
+                if arg == 'video':
                     self.client.stop_video_sender()
                 else:
                     print('[Error]: Invalid command' + '\r\n' + HELP)

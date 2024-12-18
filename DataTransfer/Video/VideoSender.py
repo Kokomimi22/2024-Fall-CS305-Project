@@ -98,6 +98,9 @@ class VideoSender:
                 print(f"Error flushing encoder: {e}")
         self.camera.stop()
 
+    def switch_mode(self):
+        self.camera.switch_mode()
+
     def terminate(self):
         if not self._running:
             return

@@ -60,7 +60,6 @@ class VideoReceiver:
             except ConnectionResetError:
                 print("Connection reset by the server")
                 break
-
             client_id, data_len, sequence_number, chunk_data = self._unpack_data(data)
 
             if chunk_data == b'TERMINATE':
@@ -135,9 +134,11 @@ class VideoReceiver:
         self.expected_sequences.clear()
         self.received_chunks.clear()
         self.frames.clear()
+        self.gridimage_queue.queue.clear()
 
     def terminate(self):
         if not self._running:
             return
         self._running = False
+        cv2.destroyAllWindows()
         self.clear()
