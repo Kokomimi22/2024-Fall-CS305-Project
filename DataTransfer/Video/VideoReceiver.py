@@ -4,8 +4,10 @@ import socket
 import struct
 import threading
 
+
 import av
 import cv2
+from PIL import Image
 
 from config import *
 from util import overlay_camera_images
@@ -24,7 +26,7 @@ class VideoReceiver:
         self._thread = None
         # 用于存储解码器的字典
         self.decoders: Dict[str,  av.codec.context.CodecContext] = {}
-        self.gridimage_queue = queue.Queue()  #线程安全队列
+        self.gridimage_queue = queue.Queue()  # 线程安全队列
 
     @staticmethod
     def _unpack_data(data):
@@ -103,8 +105,9 @@ class VideoReceiver:
                         if camera_images:
                             grid_size = int(math.ceil(math.sqrt(len(camera_images))))
                             grid_image = overlay_camera_images(camera_images, (grid_size, grid_size))
-                            self.gridimage_queue.put(grid_image)
                             cv2.imshow('Video Grid', grid_image)
+                            grid_image_pil = Image.fromarray(grid_image)
+                            self.gridimage_queue.put(grid_image_pil)
 
                             if cv2.waitKey(1) & 0xFF == ord('q'):
                                 self._running = False
@@ -122,11 +125,21 @@ class VideoReceiver:
         self.expected_sequences.pop(client_id, None)
         self.received_chunks.pop(client_id, None)
         self.frames.pop(client_id, None)
+        # 显示所有摄像头画面
+        camera_images = list(self.frames.values())
+        if camera_images:
+            grid_size = int(math.ceil(math.sqrt(len(camera_images))))
+            grid_image = overlay_camera_images(camera_images, (grid_size, grid_size))
+            grid_image_pil = Image.fromarray(grid_image)
+            self.gridimage_queue.put(grid_image_pil)
+        else:
+            self.gridimage_queue.put(Image.new('RGB', (640, 480)))
+            print("No camera images to display")
         if not self.frames:
             cv2.destroyAllWindows()
 
     def output_image(self):
-        if not self.gridimage_queue.empty():
+        if self.gridimage_queue.qsize() > 0:
             return self.gridimage_queue.get()
 
     def clear(self):

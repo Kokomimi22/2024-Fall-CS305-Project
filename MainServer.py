@@ -18,14 +18,15 @@ class MainServer:
 
     def handle_get_conferences(self):
         """
-        get all conferences
+        get all conferences and infos
         """
         return {
             'status': Status.SUCCESS.value,
-            'conferences': list(self.conference_servers.keys())
+            'conferences': list(self.conference_servers.keys()),
+            'conferences_detail': [conference_server.get_info() for conference_server in self.conference_servers.values()]
         }
 
-    def handle_create_conference(self, client_id: str) -> Dict[str, Any]:
+    def handle_create_conference(self, client_id: str, conference_name: str) -> Dict[str, Any]:
         """
         create conference: create and start the corresponding ConferenceServer, and reply necessary info to client
         """
@@ -36,7 +37,12 @@ class MainServer:
 
         # 会议服务器的端口号
         conference_port = get_port()
-        conference_server = ConferenceServer(client_id, conference_id, conference_port)
+        conference_server = ConferenceServer(
+            client_id,
+            conference_id,
+            conference_port,
+            conference_name,
+            self)
         # 为会议服务器的每个数据服务器生成端口号
         for dataType in conference_server.data_types:
             conference_server.data_serve_ports[dataType] = get_port()
@@ -161,7 +167,7 @@ class MainServer:
         elif message_type == MessageType.LOGIN.value:
             response = self.handle_login(fields.get('username'), fields.get('password'))
         elif message_type == MessageType.CREATE.value:
-            response = self.handle_create_conference(client_id)
+            response = self.handle_create_conference(client_id, fields.get('conference_name'))
         elif message_type == MessageType.CANCEL.value:
             response = self.handle_cancel_conference(conference_id, client_id)
         elif message_type == MessageType.GET_CONFERENCES.value:
