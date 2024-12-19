@@ -2,6 +2,7 @@ import math
 import queue
 import socket
 import struct
+import threading
 
 
 import av
@@ -22,6 +23,7 @@ class VideoReceiver:
         self.received_chunks = {}
         self.frames = {}
         self._running = False
+        self._thread = None
         # 用于存储解码器的字典
         self.decoders: Dict[str,  av.codec.context.CodecContext] = {}
         self.gridimage_queue = queue.Queue()  # 线程安全队列
@@ -50,8 +52,7 @@ class VideoReceiver:
         }
         self.decoders[client_id] = codec
 
-    def start(self):
-        self._running = True
+    def _process_data(self):
         while self._running:
             try:
                 data, _ = self.sock.recvfrom(65536)
@@ -62,10 +63,9 @@ class VideoReceiver:
             except ConnectionResetError:
                 print("Connection reset by the server")
                 break
-
             client_id, data_len, sequence_number, chunk_data = self._unpack_data(data)
 
-            if chunk_data == b'TERMINATE':
+            if chunk_data == b'TERMINATE' or chunk_data == b'OFF':
                 self.remove_client(client_id)
                 continue
 
@@ -148,7 +148,19 @@ class VideoReceiver:
         self.expected_sequences.clear()
         self.received_chunks.clear()
         self.frames.clear()
+        self.gridimage_queue.queue.clear()
+
+    def start(self):
+        if self._running:
+            raise RuntimeError("VideoReceiver is already running")
+        self._running = True
+        self._thread = threading.Thread(target=self._process_data)
+        self._thread.start()
 
     def terminate(self):
+        if not self._running:
+            return
         self._running = False
+        self._thread.join()
+        cv2.destroyAllWindows()
         self.clear()

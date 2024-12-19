@@ -2,9 +2,7 @@ import asyncio
 import random
 import socket
 import threading
-from codecs import StreamWriter, StreamReader
 import json
-from Protocol.VideoProtocol import VideoProtocol
 from common.user import *
 from ConferenceServer import ConferenceServer
 class MainServer:
@@ -95,17 +93,22 @@ class MainServer:
         """
         login an existing user
         """
-        # 读取json文件，查找是否有对应的用户名和密码
+        # 读取json文件，查找是否有对应的用户名和密码, 并且检查是否已经登录以及是否正确
         _user = self.user_manager.login(username, password)
-        if _user:
-            uuid = _user.uuid
+        if _user == User("1"):
             return {
-                'status': Status.SUCCESS.value,
-                'uuid': uuid
+                'status': Status.FAILED.value,
+                'message': 'User already logged in'
             }
+        if _user == User("2"):
+            return {
+                'status': Status.FAILED.value,
+                'message': 'Username or password are incorrect'
+            }
+        uuid = _user.uuid
         return {
-            'status': Status.FAILED.value,
-            'message': 'Username or password are incorrect'
+            'status': Status.SUCCESS.value,
+            'uuid': uuid
         }
 
     def handle_logout(self, uuid):
@@ -185,7 +188,7 @@ class MainServer:
         async with server:
             try:
                 await server.serve_forever()
-            except (asyncio.CancelledError, KeyboardInterrupt):
+            except asyncio.CancelledError:
                 pass
             finally:
                 for conference_server in self.conference_servers.values():
@@ -200,4 +203,7 @@ class MainServer:
         asyncio.run(self.start_server())
 if __name__ == '__main__':
     server = MainServer(SERVER_IP, MAIN_SERVER_PORT)
-    server.start()
+    try:
+        server.start()
+    except KeyboardInterrupt:
+        print("Server stopped")

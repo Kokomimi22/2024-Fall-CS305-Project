@@ -32,18 +32,24 @@ class UserManager:
         self.UUIDManager = UUID()
 
     def register(self, username, password):
+        if self.get_byname(username):
+            return None
         uuid = self.UUIDManager.generate_uuid()
         user = User(uuid, username, password)
         self.users[uuid] = user
         self.save()
         return user
 
-    def login(self, username, password):
+    def login(self, username, password) -> User:
         user = self.get_byname(username)
         if user and user.password == password:
+            # check if user is already logged in
+            if user.is_active:
+                return User("1")
             user.is_active = True
             return user
-        return None
+        # The username or password is incorrect
+        return User("2")
 
     def get_byname(self, username):
         for user in self.users.values():

@@ -2,6 +2,8 @@ import json
 import threading
 import time
 
+from PyQt5.QtCore import pyqtSignal
+
 from DataTransfer.Video.Camera import Camera
 from DataTransfer.Video.VideoReceiver import VideoReceiver
 from DataTransfer.Video.VideoSender import VideoSender
@@ -20,8 +22,7 @@ class ConferenceClient:
         self.data_server_addr: Dict[str, Any] = None  # data server in the conference server
         self.on_meeting = False  # status
         self.conns: Dict[str, socket.socket] = {}  # you may need to maintain multiple conns for a single conference
-        self.support_data_types = ['screen', 'camera', 'audio',
-                                   'text']  # the data types that can be shared, which should be modified
+        self.support_data_types = ['video', 'audio', 'text']  # the data types that can be shared, which should be modified
         self.share_data = {}
         self.sharing_task = None
         self.conference_info = None  # you may need to save and update some conference_info regularly
@@ -76,7 +77,7 @@ class ConferenceClient:
             s.sendall(json.dumps(create_request).encode())
             recv_data: Dict[str, Any] = json.loads(s.recv(CONTROL_LINE_BUFFER).decode('utf-8'))
             if recv_data['status'] == Status.SUCCESS.value:
-                #成功了就加入会议
+                # 成功了就加入会议
                 self.join_conference(recv_data['conference_id'])
                 print(f'[Info]: Created conference {self.conference_id} successfully')
             else:
@@ -89,7 +90,7 @@ class ConferenceClient:
         """
         if self.on_meeting:
             print(f'[Error]: You are already in a conference {self.conference_id}')
-            return
+            return f'[Error]: You are already in a conference {self.conference_id}'
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
             join_request = {
@@ -118,7 +119,7 @@ class ConferenceClient:
         """
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
-            return
+            return f'[Error]: You are not in a conference'
         quit_request = {
             'type': MessageType.QUIT.value,
             'client_id': self.userInfo.uuid,
@@ -131,7 +132,7 @@ class ConferenceClient:
         """
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
-            return
+            return f'[Error]: You are not in a conference'
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
             cancel_request = {
@@ -166,7 +167,6 @@ class ConferenceClient:
         running task: keep receiving certain type of data (save or output)
         you can create other functions for receiving various kinds of data
         """
-
         def recv_task():
             while self.on_meeting:
                 _recv_data = recv_conn.recv(DATA_LINE_BUFFER)
@@ -187,7 +187,9 @@ class ConferenceClient:
         self.recv_thread['text'].start()
 
     def keep_recv_video(self):
-
+        """
+        running task: keep receiving video data
+        """
         def recv_task():
             while self.on_meeting:
                 _recv_data = self.videoReceiver.output_image()
@@ -212,9 +214,9 @@ class ConferenceClient:
         start necessary running task for conference
         """
         self.conns['text'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.conns['camera'] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.conns['video'] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.conns['text'].connect(self.conf_server_addr)
-        self.conns['camera'].connect(self.data_server_addr['camera'])
+        self.conns['video'].connect(self.data_server_addr['video'])
         init_request = {
             'type': MessageType.INIT.value,
             'client_id': self.userInfo.uuid
@@ -224,12 +226,10 @@ class ConferenceClient:
         # start receiving text data
         self.keep_recv_text(self.conns['text'])
         # Establish connection with video data server
-        self.conns['camera'].sendall(json.dumps(init_request).encode())
-        self.videoReceiver = VideoReceiver(self.conns['camera'])
+        self.conns['video'].sendall(json.dumps(init_request).encode())
+        self.videoReceiver = VideoReceiver(self.conns['video'])
         self.keep_recv_video()
-        # start receiving video data
-        self.recv_thread['camera'] = threading.Thread(target=self.videoReceiver.start)
-        self.recv_thread['camera'].start()
+        self.videoReceiver.start()
 
     def close_conference(self):
         """
@@ -241,6 +241,7 @@ class ConferenceClient:
             try:
                 if self.videoSender:
                     self.videoSender.terminate()
+                    self.videoSender = None
                 for recv_thread in self.recv_thread.values():
                     if recv_thread is not threading.current_thread():
                         recv_thread.join()
@@ -261,27 +262,38 @@ class ConferenceClient:
                 except socket.error as e:
                     print(f"[Error]: Error closing connection: {e}")
 
-    def start_video_sender(self):
+    def switch_video_mode(self):
+        """
+        switch video mode between camera and screen
+        """
+        if not self.videoSender:
+            print(f'[Error]: Video sender is not started')
+            return
+        self.videoSender.switch_mode()
+
+    def start_video_sender(self, mode='camera'):
         """
         start video sender for sharing camera data
         """
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
             return
-        if not self.videoSender:
-            camera = Camera()
-            self.videoSender = VideoSender(camera, self.conns['camera'], self.userInfo.uuid)
-        self.send_thread['camera'] = threading.Thread(target=self.videoSender.start)
-        self.send_thread['camera'].start()
+        if self.videoSender:
+            print(f'[Error]: Video sender is already started. ' +
+                  'I guess you want to switch video mode, please use switch_video_mode command')
+            return
+        camera = Camera(mode)
+        self.videoSender = VideoSender(camera, self.conns['video'], self.userInfo.uuid)
+        print(f'[Info]: Start video sender in {mode} mode')
+        self.videoSender.start()
 
     def stop_video_sender(self):
         """
         stop video sender for sharing camera data
         """
         if self.videoSender:
-            self.videoSender.terminate()
+            self.videoSender.terminate(quitConf=False)
             self.videoSender = None
-            self.send_thread['camera'].join()
         else:
             print(f'[Error]: Video sender is not started')
 

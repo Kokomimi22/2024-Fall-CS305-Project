@@ -1,5 +1,6 @@
 import io
 import struct
+import threading
 import time
 
 import av
@@ -15,7 +16,7 @@ class VideoSender:
         self.frame_rate = frame_rate
         self.sock = socket_connection
         self._running = False
-
+        self._thread = None
         # 初始化编码器
         self.codec_context = self._create_codec_context()
 
@@ -42,11 +43,10 @@ class VideoSender:
         }
         return stream
 
-    def start(self):
-        self._running = True
+    def _process_data(self):
         client_id_len = len(self.client_id)
-
         while self._running:
+            start_time = time.time()
             ret, frame = self.camera.get_frame()
             if not ret:
                 continue
@@ -81,12 +81,20 @@ class VideoSender:
             except Exception as e:
                 print(f"Encoding error: {e}")
                 continue
-
+            elapse_time = time.time() - start_time
             # 控制帧率
-            time.sleep(1.0 / self.frame_rate)
+            time.sleep(max(1.0 / self.frame_rate - elapse_time, 0))
+
+    def start(self):
+        if self._running:
+            raise RuntimeError("VideoSender is already running")
+        self._running = True
+        self._thread = threading.Thread(target=self._process_data)
+        self._thread.start()
 
     def stop(self):
         self._running = False
+        self._thread.join()
         # 刷新编码器缓冲区
         if self.codec_context:
             try:
@@ -98,13 +106,23 @@ class VideoSender:
                 print(f"Error flushing encoder: {e}")
         self.camera.stop()
 
-    def terminate(self):
+    def switch_mode(self):
+        self.camera.switch_mode()
+
+    def terminate(self, quitConf: bool=True):
+        """
+        终止视频发送, quitConf为False时就是关闭视频发送，为True时是直接退出会议
+        :param quitConf: bool
+        :return:
+        """
+        if not self._running:
+            return None
         self.stop()
         terminate_signal = (struct.pack("I", len(self.client_id)) +
                             self.client_id +
                             struct.pack("Q", 0) +
                             struct.pack("I", 0) +
-                            b'TERMINATE')
+                            (b'TERMINATE' if quitConf else b'OFF'))
         try:
             self.sock.send(terminate_signal)
         except OSError:

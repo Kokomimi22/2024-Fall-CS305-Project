@@ -1,3 +1,4 @@
+import atexit
 import json
 import sys
 
@@ -106,11 +107,8 @@ class AppController(QObject):
     def send_text_message(self, message):
         conf_client.send_message(message)
 
-    def send_video_start(self, type):
-        if type == 'camera':
-            conf_client.start_video_sender()
-        elif type == 'screen':
-            pass
+    def send_video_start(self, video_type='camera'):
+        conf_client.start_video_sender(video_type)
 
     def send_video_stop(self):
         conf_client.stop_video_sender()
@@ -156,6 +154,21 @@ class AppController(QObject):
     def close(self):
         self.mainui.close()
         self.loginui.close()
+
+    def on_app_close(self):
+        """处理应用关闭时的逻辑"""
+        # 清理资源
+        print("Application is closing. Performing cleanup...")
+
+        # 停止音频、视频等服务
+        self.send_audio_stop()
+        self.send_video_stop()
+
+        try:
+            conf_client.quit_conference() # 退出会议
+            conf_client.logout()  # 断开与服务器的连接
+        except Exception as e:
+            print(f"Error disconnecting from server: {e}")
 
 class LoginController:
     def __init__(self, loginui: LoginWindow, app: AppController):
@@ -336,5 +349,6 @@ if __name__ == '__main__':
     conf_client.set_controller(controller)
     controller.start()
 
+    atexit.register(controller.on_app_close)
     sys.exit(app.exec_())
 

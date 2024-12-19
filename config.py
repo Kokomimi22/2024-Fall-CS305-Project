@@ -5,6 +5,11 @@ HELP = 'Create         : create an conference\n' \
        'Quit           : quit an on-going conference\n' \
        'Cancel         : cancel your on-going conference (only the manager)\n' \
        'On [datatype]  : turn on the data type\n\n' \
+       'Get_conferences: get the list of all conferences\n' \
+       'Switch_video_mode: switch the video mode\n' \
+       'Logout         : logout\n' \
+       'Exit           : exit the program\n' \
+       'Help           : show help information\n'
 
 SERVER_IP = '127.0.0.1'
 MAIN_SERVER_PORT = 8888
@@ -23,17 +28,26 @@ SUCCESSFUL = True
 FAILED = False
 camera_width, camera_height = 480, 480  # resolution for camera capture
 VIDEO_CHUNK_SIZE = 20000  # UDP
+
+
 class MessageType(Enum):
-       GET_CONFERENCES = 'get_conferences'
-       LOGIN = 'login'
-       LOGOUT = 'logout'
-       CREATE = 'create_conference'
-       JOIN = 'join_conference'
-       QUIT = 'quit_conference'
-       CANCEL = 'cancel_conference'
-       REGISTER = 'register'
-       INIT = 'init_conference'
-       TEXT_MESSAGE = 'text_message'
+    GET_CONFERENCES = 'get_conferences'
+    LOGIN = 'login'
+    LOGOUT = 'logout'
+    CREATE = 'create_conference'
+    JOIN = 'join_conference'
+    QUIT = 'quit_conference'
+    CANCEL = 'cancel_conference'
+    REGISTER = 'register'
+    INIT = 'init_conference'
+    TEXT_MESSAGE = 'text_message'
+
+
 class Status(Enum):
-       SUCCESS = True
-       FAILED = False
+    SUCCESS = True
+    FAILED = False
+
+
+class DataTransferMode(Enum):
+    P2P = 'Peer-to-Peer'
+    CS = 'Client-Server'

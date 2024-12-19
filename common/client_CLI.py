@@ -42,10 +42,16 @@ class ClientCLI:
             elif cmd_input == 'exit':
                 if self.client.on_meeting:
                     self.client.quit_conference()
-                    self.client.logout()
+                self.client.logout()
                 return False
+            elif cmd_input == 'logout':
+                if self.client.on_meeting:
+                    self.client.quit_conference()
+                self.client.logout()
             elif cmd_input == 'get_conferences':
                 self.client.get_conference_list()
+            elif cmd_input == 'switch_video_mode':
+                self.client.switch_video_mode()
             else:
                 print('[Error]: Invalid command' + '\r\n' + HELP)
         elif len(fields) == 2:
@@ -54,11 +60,13 @@ class ClientCLI:
                 self.client.join_conference(int(arg))
             elif fields[0] == 'on':
                 if arg == 'camera':
-                    self.client.start_video_sender()
+                    self.client.start_video_sender('camera')
+                elif arg == 'screen':
+                    self.client.start_video_sender('screen')
                 else:
                     print('[Error]: Invalid command' + '\r\n' + HELP)
             elif fields[0] == 'off':
-                if arg == 'camera':
+                if arg == 'video':
                     self.client.stop_video_sender()
                 else:
                     print('[Error]: Invalid command' + '\r\n' + HELP)
