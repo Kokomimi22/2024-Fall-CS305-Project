@@ -46,6 +46,7 @@ class VideoSender:
     def _process_data(self):
         client_id_len = len(self.client_id)
         while self._running:
+            start_time = time.time()
             ret, frame = self.camera.get_frame()
             if not ret:
                 continue
@@ -80,9 +81,9 @@ class VideoSender:
             except Exception as e:
                 print(f"Encoding error: {e}")
                 continue
-
+            elapse_time = time.time() - start_time
             # 控制帧率
-            time.sleep(1.0 / self.frame_rate)
+            time.sleep(max(1.0 / self.frame_rate - elapse_time, 0))
 
     def start(self):
         if self._running:

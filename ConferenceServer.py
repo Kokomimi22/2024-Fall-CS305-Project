@@ -15,11 +15,13 @@ class ConferenceServer:
         self.conference_id: int = conference_id
         self.conf_serve_port: int = conf_serve_port
         self.data_serve_ports = {}
-        self.data_types: List[str] = ['camera', 'audio', 'text']
+        self.data_types: List[str] = ['video', 'audio', 'text']
         self.clients_info = []
-        self.client_conns = {}
-        # self.clients_addr[datatype][client_id] = addr
-        # ,it is used to store the address of the client when transmitting screen, camera, and audio data
+        self.client_conns = {} # self.client_conns[addr] = (reader, writer), This is for text data like quit, init, and text message
+        """
+        self.clients_addr[datatype][client_id] = addr
+        ,it is used to store the address of the client when transmitting screen, camera, and audio data
+        """
         self.clients_addr = {datatype: {} for datatype in self.data_types if datatype != 'text'}
         self.mode = 'Client-Server'
         self.running = True
@@ -88,9 +90,9 @@ class ConferenceServer:
                 await client_writer.drain()
 
     async def handle_video(self, data, addr):
-        for client_addr in self.clients_addr['camera'].values():
+        for client_addr in self.clients_addr['video'].values():
             if client_addr != addr:
-                self.transport['camera'].sendto(data, client_addr)
+                self.transport['video'].sendto(data, client_addr)
 
     async def log(self):
         try:
@@ -114,8 +116,8 @@ class ConferenceServer:
         # Cancel all tasks
         tasks = [task for task in asyncio.all_tasks(self.loop) if task is not asyncio.current_task()]
         success = np.array([task.cancel() for task in tasks])
-        for client_addr in self.clients_addr['camera'].values():
-            self.transport['camera'].sendto(b'Cancelled', client_addr)
+        for client_addr in self.clients_addr['video'].values():
+            self.transport['video'].sendto(b'Cancelled', client_addr)
         await asyncio.gather(*tasks, return_exceptions=True)
         if success.all():
             print(f"Conference {self.conference_id} successfully cancelled.")
@@ -126,10 +128,10 @@ class ConferenceServer:
         server_coro = asyncio.start_server(self.handle_client, '127.0.0.1', self.conf_serve_port)
         video_server_coro = self.loop.create_datagram_endpoint(
             lambda: VideoProtocol(self),
-            local_addr=('127.0.0.1', self.data_serve_ports['camera'])
+            local_addr=('127.0.0.1', self.data_serve_ports['video'])
         )
         server = self.loop.run_until_complete(server_coro)
-        self.transport['camera'], _ = self.loop.run_until_complete(video_server_coro)
+        self.transport['video'], _ = self.loop.run_until_complete(video_server_coro)
         self.loop.create_task(self.log())
         try:
             self.loop.run_forever()

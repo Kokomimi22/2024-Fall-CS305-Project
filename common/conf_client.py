@@ -19,8 +19,7 @@ class ConferenceClient:
         self.data_server_addr: Dict[str, Any] = None  # data server in the conference server
         self.on_meeting = False  # status
         self.conns: Dict[str, socket.socket] = {}  # you may need to maintain multiple conns for a single conference
-        self.support_data_types = ['screen', 'camera', 'audio',
-                                   'text']  # the data types that can be shared, which should be modified
+        self.support_data_types = ['video', 'audio', 'text']  # the data types that can be shared, which should be modified
         self.share_data = {}
         self.sharing_task = None
         self.conference_info = None  # you may need to save and update some conference_info regularly
@@ -91,7 +90,7 @@ class ConferenceClient:
         """
         if self.on_meeting:
             print(f'[Error]: You are already in a conference {self.conference_id}')
-            return
+            return f'[Error]: You are already in a conference {self.conference_id}'
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
             join_request = {
@@ -120,7 +119,7 @@ class ConferenceClient:
         """
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
-            return
+            return f'[Error]: You are not in a conference'
         quit_request = {
             'type': MessageType.QUIT.value,
             'client_id': self.userInfo.uuid,
@@ -133,7 +132,7 @@ class ConferenceClient:
         """
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
-            return
+            return f'[Error]: You are not in a conference'
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
             cancel_request = {
@@ -215,9 +214,9 @@ class ConferenceClient:
         start necessary running task for conference
         """
         self.conns['text'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.conns['camera'] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.conns['video'] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.conns['text'].connect(self.conf_server_addr)
-        self.conns['camera'].connect(self.data_server_addr['camera'])
+        self.conns['video'].connect(self.data_server_addr['video'])
         init_request = {
             'type': MessageType.INIT.value,
             'client_id': self.userInfo.uuid
@@ -227,8 +226,8 @@ class ConferenceClient:
         # start receiving text data
         self.keep_recv_text(self.conns['text'])
         # Establish connection with video data server
-        self.conns['camera'].sendall(json.dumps(init_request).encode())
-        self.videoReceiver = VideoReceiver(self.conns['camera'])
+        self.conns['video'].sendall(json.dumps(init_request).encode())
+        self.videoReceiver = VideoReceiver(self.conns['video'])
         # start receiving video data
         self.videoReceiver.start()
 
@@ -284,7 +283,7 @@ class ConferenceClient:
                   'I guess you want to switch video mode, please use switch_video_mode command')
             return
         camera = Camera(mode)
-        self.videoSender = VideoSender(camera, self.conns['camera'], self.userInfo.uuid)
+        self.videoSender = VideoSender(camera, self.conns['video'], self.userInfo.uuid)
         print(f'[Info]: Start video sender in {mode} mode')
         self.videoSender.start()
 

@@ -105,11 +105,8 @@ class AppController(QObject):
     def send_text_message(self, message):
         conf_client.send_message(message)
 
-    def send_video_start(self, type='camera'):
-        if type == 'camera':
-            conf_client.start_video_sender()
-        elif type == 'screen':
-            pass
+    def send_video_start(self, video_type='camera'):
+        conf_client.start_video_sender(video_type)
 
     def send_video_stop(self):
         conf_client.stop_video_sender()
