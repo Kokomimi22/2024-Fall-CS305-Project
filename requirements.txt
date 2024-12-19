@@ -10,3 +10,5 @@ PyQt_Fluent_Widgets==1.7.1
 pywin32==302
 ffmpeg-python==0.2.0
 av==12.3.0
+opencv-python~=4.10.0.84
+deprecated~=1.2.15

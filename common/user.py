@@ -32,6 +32,8 @@ class UserManager:
         self.UUIDManager = UUID()
 
     def register(self, username, password):
+        if self.get_byname(username):
+            return None
         uuid = self.UUIDManager.generate_uuid()
         user = User(uuid, username, password)
         self.users[uuid] = user
