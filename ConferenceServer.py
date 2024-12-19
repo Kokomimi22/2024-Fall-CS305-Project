@@ -1,33 +1,39 @@
 import asyncio
-import random
-import socket
-import threading
 from codecs import StreamWriter, StreamReader
-import json
 
-from Protocol.AudioProtocol import AudioProtocol
 from Protocol.VideoProtocol import VideoProtocol
 from common.user import *
 
+
 class ConferenceServer:
-    def __init__(self, manager_id: str, conference_id: int, conf_serve_port: int):
+    def __init__(self, manager_id: str, conference_id: int, conf_serve_port: int, conference_name: str, main_server: 'MainServer'):
         self.transport: Dict[str, asyncio.DatagramTransport] = {} # self.transport[datatype] = transport
         # the uuid of the manager of the conference
         self.manager_id: str = manager_id  # str(uuid)
         self.conference_id: int = conference_id
+        self.conference_name: str = conference_name
         self.conf_serve_port: int = conf_serve_port
         self.data_serve_ports = {}
         self.data_types: List[str] = ['video', 'audio', 'text']
         self.clients_info = []
-        self.client_conns = {} # self.client_conns[addr] = (reader, writer), This is for text data like quit, init, and text message
+        self.client_conns_text = {} # self.client_conns_text[addr] = (reader, writer), This is for text data like quit, init, and text message
         """
         self.clients_addr[datatype][client_id] = addr
         ,it is used to store the address of the client when transmitting screen, camera, and audio data
         """
-        self.clients_addr = {datatype: {} for datatype in self.data_types if datatype != 'text'}
+        self.clients_addr = {datatype: {} for datatype in self.data_types}
         self.mode = 'Client-Server'
         self.running = True
         self.loop = asyncio.new_event_loop()
+        self.main_server = main_server
+
+    def get_info(self):
+        return {
+            'conference_name': self.conference_name,
+            'conference_id': self.conference_id,
+            'manager_id': self.manager_id,
+            'mode': self.mode
+        }
 
     async def handle_client(self, reader: StreamReader, writer: StreamWriter):
         """
@@ -35,7 +41,8 @@ class ConferenceServer:
         """
         addr = writer.get_extra_info('peername')
         self.clients_info.append(addr)
-        self.client_conns[addr] = (reader, writer)
+        self.client_conns_text[addr] = (reader, writer)
+        self.clients_addr['text'] = addr
         client_id = None
         try:
             while self.running:
@@ -59,7 +66,7 @@ class ConferenceServer:
         except ConnectionResetError:
             print(f"Connection reset by peer {addr}")
         finally:
-            del self.client_conns[addr]
+            del self.client_conns_text[addr]
             self.clients_info.remove(addr)
             # judge if the writer is closed
             if not writer.is_closing():
@@ -86,15 +93,15 @@ class ConferenceServer:
             'message': message,
             'sender_name': sender_name
         }
-        for client_reader, client_writer in self.client_conns.values():
+        for client_reader, client_writer in self.client_conns_text.values():
             if client_writer != sender:
                 client_writer.write(json.dumps(emit_message).encode())
                 await client_writer.drain()
 
     async def handle_video(self, data, addr):
         for client_addr in self.clients_addr['video'].values():
-            if client_addr != addr:
-                self.transport['video'].sendto(data, client_addr)
+            self.transport['video'].sendto(data, client_addr)
+            print(f"Sending video data to {client_addr}")
 
     async def log(self):
         try:
@@ -123,6 +130,7 @@ class ConferenceServer:
         await asyncio.gather(*tasks, return_exceptions=True)
         if success.all():
             print(f"Conference {self.conference_id} successfully cancelled.")
+            self.main_server.conference_servers.pop(self.conference_id)
         else:
             print(f"Failed to cancel conference {self.conference_id}.")
 
@@ -132,13 +140,8 @@ class ConferenceServer:
             lambda: VideoProtocol(self),
             local_addr=('127.0.0.1', self.data_serve_ports['video'])
         )
-        audio_server_coro = self.loop.create_datagram_endpoint(
-            lambda: AudioProtocol(self),
-            local_addr=('127.0.0.1', self.data_serve_ports['audio'])
-        )
         server = self.loop.run_until_complete(server_coro)
         self.transport['video'], _ = self.loop.run_until_complete(video_server_coro)
-        self.transport['audio'], _ = self.loop.run_until_complete(audio_server_coro)
         self.loop.create_task(self.log())
         try:
             self.loop.run_forever()

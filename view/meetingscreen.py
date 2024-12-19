@@ -108,7 +108,7 @@ class ViewWidget(QWidget):
     def defaultImage(self):
         w, h = self.width() if self.width() > 0 else 960, self.height() if self.height() > 0 else 540
         image = QImage(w, h, QImage.Format_RGB32)
-        image.fill(Qt.white)
+        image.fill(Qt.black)
         return image
 
     def setToDefault(self):
@@ -132,6 +132,7 @@ class ViewWidget(QWidget):
 
     def set_image(self, image):
         self.currentImage = self.fit_image(image)
+        self.update()
 
     def setSpeaker(self, name):
         self.speakerLabel.setName(name)
@@ -148,7 +149,6 @@ class ViewWidget(QWidget):
             painter.drawImage((w - image.width()) // 2, 0, image)
             painter.end()
             image = padding
-
         return image
 
 
@@ -209,6 +209,8 @@ class FullCommandBar(CommandBar):
 
     share_signal = pyqtSignal(str)
     speak_signal = pyqtSignal(bool)
+    quit_signal = pyqtSignal()
+    cancel_signal = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -234,8 +236,8 @@ class FullCommandBar(CommandBar):
         self.addSeparator()
 
         self.addActions([
-            Action(FluentIcon.RETURN, 'Leave', triggered=self.leave),
-            Action(FluentIcon.DELETE, 'Cancel', triggered=self.end)
+            Action(FluentIcon.RETURN, 'Leave', triggered=lambda : self.quit_signal.emit()),
+            Action(FluentIcon.DELETE, 'Cancel', triggered=lambda : self.cancel_signal.emit())
         ])
 
         self.resizeToSuitableWidth()
