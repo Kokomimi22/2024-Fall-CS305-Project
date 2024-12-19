@@ -281,7 +281,7 @@ class ConferenceClient:
             print(f'[Error]: You are not in a conference')
             return
         if self.videoSender:
-            print(f'[Error]: Video sender is already started' +
+            print(f'[Error]: Video sender is already started. ' +
                   'I guess you want to switch video mode, please use switch_video_mode command')
             return
         camera = Camera(mode)
@@ -294,7 +294,7 @@ class ConferenceClient:
         stop video sender for sharing camera data
         """
         if self.videoSender:
-            self.videoSender.terminate()
+            self.videoSender.terminate(quitConf=False)
             self.videoSender = None
         else:
             print(f'[Error]: Video sender is not started')

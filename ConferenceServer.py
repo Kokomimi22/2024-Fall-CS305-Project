@@ -1,11 +1,9 @@
 import asyncio
-import random
-import socket
-import threading
 from codecs import StreamWriter, StreamReader
-import json
+
 from Protocol.VideoProtocol import VideoProtocol
 from common.user import *
+
 
 class ConferenceServer:
     def __init__(self, manager_id: str, conference_id: int, conf_serve_port: int):
@@ -17,12 +15,12 @@ class ConferenceServer:
         self.data_serve_ports = {}
         self.data_types: List[str] = ['video', 'audio', 'text']
         self.clients_info = []
-        self.client_conns = {} # self.client_conns[addr] = (reader, writer), This is for text data like quit, init, and text message
+        self.client_conns_text = {} # self.client_conns_text[addr] = (reader, writer), This is for text data like quit, init, and text message
         """
         self.clients_addr[datatype][client_id] = addr
         ,it is used to store the address of the client when transmitting screen, camera, and audio data
         """
-        self.clients_addr = {datatype: {} for datatype in self.data_types if datatype != 'text'}
+        self.clients_addr = {datatype: {} for datatype in self.data_types}
         self.mode = 'Client-Server'
         self.running = True
         self.loop = asyncio.new_event_loop()
@@ -33,7 +31,8 @@ class ConferenceServer:
         """
         addr = writer.get_extra_info('peername')
         self.clients_info.append(addr)
-        self.client_conns[addr] = (reader, writer)
+        self.client_conns_text[addr] = (reader, writer)
+        self.clients_addr['text'] = addr
         client_id = None
         try:
             while self.running:
@@ -57,7 +56,7 @@ class ConferenceServer:
         except ConnectionResetError:
             print(f"Connection reset by peer {addr}")
         finally:
-            del self.client_conns[addr]
+            del self.client_conns_text[addr]
             self.clients_info.remove(addr)
             # judge if the writer is closed
             if not writer.is_closing():
@@ -84,7 +83,7 @@ class ConferenceServer:
             'message': message,
             'sender_name': sender_name
         }
-        for client_reader, client_writer in self.client_conns.values():
+        for client_reader, client_writer in self.client_conns_text.values():
             if client_writer != sender:
                 client_writer.write(json.dumps(emit_message).encode())
                 await client_writer.drain()
@@ -93,6 +92,7 @@ class ConferenceServer:
         for client_addr in self.clients_addr['video'].values():
             if client_addr != addr:
                 self.transport['video'].sendto(data, client_addr)
+
 
     async def log(self):
         try:

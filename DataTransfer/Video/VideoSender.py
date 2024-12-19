@@ -109,15 +109,20 @@ class VideoSender:
     def switch_mode(self):
         self.camera.switch_mode()
 
-    def terminate(self):
+    def terminate(self, quitConf: bool=True):
+        """
+        终止视频发送, quitConf为False时就是关闭视频发送，为True时是直接退出会议
+        :param quitConf: bool
+        :return:
+        """
         if not self._running:
-            return
+            return None
         self.stop()
         terminate_signal = (struct.pack("I", len(self.client_id)) +
                             self.client_id +
                             struct.pack("Q", 0) +
                             struct.pack("I", 0) +
-                            b'TERMINATE')
+                            (b'TERMINATE' if quitConf else b'OFF'))
         try:
             self.sock.send(terminate_signal)
         except OSError:

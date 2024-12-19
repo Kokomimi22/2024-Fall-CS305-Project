@@ -63,7 +63,7 @@ class VideoReceiver:
                 break
             client_id, data_len, sequence_number, chunk_data = self._unpack_data(data)
 
-            if chunk_data == b'TERMINATE':
+            if chunk_data == b'TERMINATE' or chunk_data == b'OFF':
                 self.remove_client(client_id)
                 continue
 

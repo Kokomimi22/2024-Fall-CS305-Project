@@ -2,9 +2,7 @@ import asyncio
 import random
 import socket
 import threading
-from codecs import StreamWriter, StreamReader
 import json
-from Protocol.VideoProtocol import VideoProtocol
 from common.user import *
 from ConferenceServer import ConferenceServer
 class MainServer:
@@ -184,7 +182,7 @@ class MainServer:
         async with server:
             try:
                 await server.serve_forever()
-            except (asyncio.CancelledError, KeyboardInterrupt):
+            except asyncio.CancelledError:
                 pass
             finally:
                 for conference_server in self.conference_servers.values():
@@ -199,4 +197,7 @@ class MainServer:
         asyncio.run(self.start_server())
 if __name__ == '__main__':
     server = MainServer(SERVER_IP, MAIN_SERVER_PORT)
-    server.start()
+    try:
+        server.start()
+    except KeyboardInterrupt:
+        print("Server stopped")
