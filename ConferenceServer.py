@@ -4,6 +4,8 @@ import socket
 import threading
 from codecs import StreamWriter, StreamReader
 import json
+
+from Protocol.AudioProtocol import AudioProtocol
 from Protocol.VideoProtocol import VideoProtocol
 from common.user import *
 
@@ -130,8 +132,13 @@ class ConferenceServer:
             lambda: VideoProtocol(self),
             local_addr=('127.0.0.1', self.data_serve_ports['video'])
         )
+        audio_server_coro = self.loop.create_datagram_endpoint(
+            lambda: AudioProtocol(self),
+            local_addr=('127.0.0.1', self.data_serve_ports['audio'])
+        )
         server = self.loop.run_until_complete(server_coro)
         self.transport['video'], _ = self.loop.run_until_complete(video_server_coro)
+        self.transport['audio'], _ = self.loop.run_until_complete(audio_server_coro)
         self.loop.create_task(self.log())
         try:
             self.loop.run_forever()

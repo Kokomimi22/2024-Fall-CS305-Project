@@ -40,6 +40,8 @@ class AudioSender:
             self.server_socket.close()
 
 
+
+
 # Initialize pyaudio
 audio = pyaudio.PyAudio()
 

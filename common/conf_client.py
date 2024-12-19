@@ -3,9 +3,12 @@ import threading
 
 from PyQt5.QtCore import pyqtSignal
 
+from DataTransfer.Audio.AudioReceiver import AudioReceiver
+from DataTransfer.Audio.AudioSender import AudioSender
 from DataTransfer.Video.Camera import Camera
 from DataTransfer.Video.VideoReceiver import VideoReceiver
 from DataTransfer.Video.VideoSender import VideoSender
+
 from common.user import User
 from util import *
 
@@ -29,6 +32,8 @@ class ConferenceClient:
         self.recv_data = None  # you may need to save received streamd data from other clients in conference
         self.videoSender: VideoSender = None  # you may need to maintain multiple video senders for a single conference
         self.videoReceiver: VideoReceiver = None
+        self.audioSender: AudioSender = None
+        self.audioReceiver: AudioReceiver = None
         if isinstance(app_cls, type):
             self.update_signal = {
                 'text': app_cls.message_received,  # type: pyqtSignal(str, str)
