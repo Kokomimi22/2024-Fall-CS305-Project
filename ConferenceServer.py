@@ -8,11 +8,12 @@ from Protocol.VideoProtocol import VideoProtocol
 from common.user import *
 
 class ConferenceServer:
-    def __init__(self, manager_id: str, conference_id: int, conf_serve_port: int):
+    def __init__(self, manager_id: str, conference_id: int, conf_serve_port: int, conference_name: str, main_server: 'MainServer'):
         self.transport: Dict[str, asyncio.DatagramTransport] = {} # self.transport[datatype] = transport
         # the uuid of the manager of the conference
         self.manager_id: str = manager_id  # str(uuid)
         self.conference_id: int = conference_id
+        self.conference_name: str = conference_name
         self.conf_serve_port: int = conf_serve_port
         self.data_serve_ports = {}
         self.data_types: List[str] = ['camera', 'audio', 'text']
@@ -24,6 +25,15 @@ class ConferenceServer:
         self.mode = 'Client-Server'
         self.running = True
         self.loop = asyncio.new_event_loop()
+        self.main_server = main_server
+
+    def get_info(self):
+        return {
+            'conference_name': self.conference_name,
+            'conference_id': self.conference_id,
+            'manager_id': self.manager_id,
+            'mode': self.mode
+        }
 
     async def handle_client(self, reader: StreamReader, writer: StreamWriter):
         """
@@ -89,8 +99,8 @@ class ConferenceServer:
 
     async def handle_video(self, data, addr):
         for client_addr in self.clients_addr['camera'].values():
-            if client_addr != addr:
-                self.transport['camera'].sendto(data, client_addr)
+            self.transport['camera'].sendto(data, client_addr)
+            print(f"Sending video data to {client_addr}")
 
     async def log(self):
         try:
@@ -119,6 +129,7 @@ class ConferenceServer:
         await asyncio.gather(*tasks, return_exceptions=True)
         if success.all():
             print(f"Conference {self.conference_id} successfully cancelled.")
+            self.main_server.conference_servers.pop(self.conference_id)
         else:
             print(f"Failed to cancel conference {self.conference_id}.")
 

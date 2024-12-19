@@ -34,7 +34,7 @@ class ClientCLI:
             if cmd_input in ('?', '？'):
                 print(HELP)
             elif cmd_input == 'create':
-                self.client.create_conference()
+                self.client.create_conference('default')
             elif cmd_input == 'quit':
                 self.client.quit_conference()
             elif cmd_input == 'cancel':

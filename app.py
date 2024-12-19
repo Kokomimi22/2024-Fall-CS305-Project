@@ -1,11 +1,13 @@
 import json
 import sys
 
+from PIL.Image import Image
 from PyQt5.QtCore import pyqtSignal, QObject
 
 from common.conf_client import ConferenceClient
 from component.audiopreview import AudioPreview
-from component.meetingcontroller import MeetingController, MeetingType
+from component.meetingcardgroup import MeetingCardsGroupHandler
+from component.meetingcontroller import MeetingController
 from component.meetingcreate import MeetingCreate
 from component.videopreview import VideoPreview
 from config import *
@@ -13,8 +15,7 @@ from view.gui import LoginWindow
 from view.gui import Main
 from view.gui import TestInterface
 from view.homescreen import HomeInterface
-from view.meetingscreen import MeetingInterfaceBase
-
+from view.meetingscreen import MeetingInterfaceBase, SimpleMeetingInterface
 
 
 class AppConfig:
@@ -81,7 +82,7 @@ class AppController(QObject):
 
     closed = pyqtSignal()
     message_received = pyqtSignal(str, str)  # sender_name, message
-    video_received = pyqtSignal(bytes)  # video
+    video_received = pyqtSignal(Image)  # video
     audio_received = pyqtSignal(bytes)  # audio
 
     def __init__(self, mainui: Main, loginui: LoginWindow):
@@ -105,7 +106,7 @@ class AppController(QObject):
     def send_text_message(self, message):
         conf_client.send_message(message)
 
-    def send_video_start(self, type='camera'):
+    def send_video_start(self, type):
         if type == 'camera':
             conf_client.start_video_sender()
         elif type == 'screen':
@@ -125,6 +126,18 @@ class AppController(QObject):
     def send_audio_stop(self):
         # TODO: stop AudioSender
         pass
+
+    def cancel_conference(self):
+        conf_client.cancel_conference()
+
+    def get_meetings(self):
+        res = conf_client.get_conference_list()
+        details = {}
+        for conf_id in res['conferences']:
+            for detail in res['conferences_detail']:
+                if detail['conference_id'] == conf_id:
+                    details[conf_id] = detail
+        return res['conferences'], details
 
     def switch_ui(self, to='main'):
         if to == 'main':
@@ -228,29 +241,30 @@ class HomeController:
     def __init__(self, homeui: HomeInterface, app: AppController):
         self.interface = homeui
         self.app = app
-        self.meetingCreateHandler = MeetingCreate(self.interface)
+        self.meetingCreateHandler = MeetingCreate(self.interface, self.app)
+        self.meetingCardGroup = MeetingCardsGroupHandler(self.interface, self.app)
         self.meetingController = None
         self.meetingInterface = None
 
         # connect signal
         self.meetingCreateHandler.meeting_created.connect(self.handle_meeting_create)
+        self.meetingCardGroup.meeting_joined.connect(self.handle_meeting_join)
 
     def handle_meeting_create(self, meeting_data):
 
         try:
-            response = conf_client.create_conference()
+            response = conf_client.create_conference(meeting_data['meeting_name'])
             if response['status'] == Status.SUCCESS.value:
                 # self.interface.info('success', 'Success', 'Meeting created successfully')
                 self.meetingInterface = MeetingInterfaceBase()
                 self.meetingInterface.setTitle(meeting_data['meeting_name'])
 
                 user_view = conf_client.user()
-                meeting_type = MeetingType.OWNEDSINGLE if meeting_data['meeting_type'] == 'single' else MeetingType.OWNEDMULTIPUL
-                self.meetingController = MeetingController(self.meetingInterface, self.app, user_view)
+                self.meetingController = MeetingController(self.meetingInterface, self.app, user_view, isOwned=True)
                 self._init_signal_connection()
                 self.meetingInterface.show()
             else:
-                # self.interface.info('error', 'Error', 'Failed to create meeting')
+                self.interface.info('error', 'Error', 'Failed to create meeting')
                 pass
 
         except Exception as e:
@@ -265,6 +279,22 @@ class HomeController:
             self.app.message_received.connect(self.meetingController.message_received)
             self.app.video_received.connect(self.meetingController.video_received)
             self.app.audio_received.connect(self.meetingController.audio_received)
+
+    def handle_meeting_join(self, meeting_id, meeting_name):
+        try:
+            response = conf_client.join_conference(meeting_id)
+            if response['status'] == Status.SUCCESS.value:
+                self.meetingInterface = SimpleMeetingInterface()
+                self.meetingInterface.setTitle(meeting_name)
+                user_view = conf_client.user()
+                self.meetingController = MeetingController(self.meetingInterface, self.app, user_view, isOwned=False)
+                self._init_signal_connection()
+                self.meetingInterface.show()
+            else:
+                self.interface.info('error', 'Error', 'Failed to join meeting')
+        except Exception as e:
+            print(e)
+            self.interface.info('error', 'Error', 'Failed to join meeting')
 
     def handle_quit(self):
         try:
@@ -300,8 +330,10 @@ if __name__ == '__main__':
 
     mainui = Main()
     loginui = LoginWindow()
-    conf_client = ConferenceClient(AppController)
+
+    conf_client = ConferenceClient()
     controller = AppController(mainui, loginui=loginui)
+    conf_client.set_controller(controller)
     controller.start()
 
     sys.exit(app.exec_())

@@ -1,5 +1,6 @@
 import json
 import threading
+import time
 
 from DataTransfer.Video.Camera import Camera
 from DataTransfer.Video.VideoReceiver import VideoReceiver
@@ -9,7 +10,7 @@ from util import *
 
 
 class ConferenceClient:
-    def __init__(self, app_cls=None):
+    def __init__(self, app=None):
         # sync client
         self.userInfo: User = None
         self.recv_thread: Dict[str, threading.Thread] = {}
@@ -28,12 +29,7 @@ class ConferenceClient:
         self.recv_data = None  # you may need to save received streamd data from other clients in conference
         self.videoSender: VideoSender = None  # you may need to maintain multiple video senders for a single conference
         self.videoReceiver: VideoReceiver = None
-        if isinstance(app_cls, type):
-            self.update_signal = {
-                'text': app_cls.message_received, # type: pyqtSignal(str, str)
-                'video': app_cls.video_received,  # type: pyqtSignal(bytes)
-                'audio': app_cls.audio_received   # type: pyqtSignal(bytes)
-            }  # {data_type: handler} for GUI update
+        self.update_signal = None
 
     def user(self):
         return self.userInfo
@@ -57,11 +53,12 @@ class ConferenceClient:
             response = json.loads(recv_data)
             if response['status'] == Status.SUCCESS.value:
                 print(response['conferences'])
+                print(response)
             else:
                 print(f"[Error]: {response['message']}")
             return response
 
-    def create_conference(self):
+    def create_conference(self, conference_name: str):
         """
         create a conference: send create-conference request to server and obtain necessary data to
         """
@@ -73,7 +70,8 @@ class ConferenceClient:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
             create_request = {
                 'type': MessageType.CREATE.value,
-                'client_id': self.userInfo.uuid
+                'client_id': self.userInfo.uuid,
+                'conference_name': conference_name
             }
             s.sendall(json.dumps(create_request).encode())
             recv_data: Dict[str, Any] = json.loads(s.recv(CONTROL_LINE_BUFFER).decode('utf-8'))
@@ -158,7 +156,7 @@ class ConferenceClient:
             return
         message_post = {
             'type': MessageType.TEXT_MESSAGE.value,
-            'client_name': self.userInfo.username,
+            'sender_name': self.userInfo.username,
             'message': message
         }
         self.conns['text'].sendall(json.dumps(message_post).encode())
@@ -180,8 +178,8 @@ class ConferenceClient:
                     try:
                         message = json.loads(_recv_data.decode())
                         if message['type'] == MessageType.TEXT_MESSAGE.value and self.update_signal.get('text'):
-                            self.update_signal['text'].emit(message['client_name'], message['message'])
-                            print(f'{message["client_name"]}: {message["message"]}')
+                            self.update_signal['text'].emit(message['sender_name'], message['message'])
+                            print(f'{message["sender_name"]}: {message["message"]}')
                     except UnicodeDecodeError:
                         print(f'[Info]: Received data: {len(_recv_data)} bytes')
 
@@ -192,10 +190,10 @@ class ConferenceClient:
 
         def recv_task():
             while self.on_meeting:
-                _recv_data = self.videoReceiver.output_image().tobytes()
+                _recv_data = self.videoReceiver.output_image()
                 if _recv_data:
                     self.update_signal['video'].emit(_recv_data)
-                    print(f'[Info]: Received video data: {len(_recv_data)} bytes')
+                time.sleep(0.01)
 
         self.recv_thread['video'] = threading.Thread(target=recv_task)
         self.recv_thread['video'].start()
@@ -228,6 +226,7 @@ class ConferenceClient:
         # Establish connection with video data server
         self.conns['camera'].sendall(json.dumps(init_request).encode())
         self.videoReceiver = VideoReceiver(self.conns['camera'])
+        self.keep_recv_video()
         # start receiving video data
         self.recv_thread['camera'] = threading.Thread(target=self.videoReceiver.start)
         self.recv_thread['camera'].start()
@@ -327,5 +326,12 @@ class ConferenceClient:
             else:
                 print(f"[Error]: {response['message']}")
             return response
+
+    def set_controller(self, app):
+        self.update_signal = {
+            'text': app.message_received,  # type: pyqtSignal(str, str)
+            'video': app.video_received,  # type: pyqtSignal(Image)
+            'audio': app.audio_received  # type: pyqtSignal(bytes)
+        }  # {data_type: handler} for GUI update
 
 

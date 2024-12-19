@@ -1,11 +1,12 @@
 import uuid
+from multiprocessing.spawn import set_executable
 
 from qfluentwidgets import SearchLineEdit, RoundMenu, Action, TitleLabel, SubtitleLabel, ImageLabel, \
     SingleDirectionScrollArea, FluentIcon, MessageBoxBase, LineEdit, RadioButton, BodyLabel, InfoBar, InfoBarPosition
 from PyQt5.QtWidgets import QSpacerItem, QSizePolicy, QWidget, QVBoxLayout, QPushButton, QGraphicsDropShadowEffect, \
     QFrame, QHBoxLayout, QButtonGroup
 from PyQt5.QtGui import QPainter, QPainterPath, QLinearGradient, QBrush, QImage, QIcon, QColor, QDesktopServices
-from PyQt5.QtCore import QRectF, Qt, QSize, QUrl
+from PyQt5.QtCore import QRectF, Qt, QSize, QUrl, pyqtSignal
 from PyQt5.QtGui import QPainter, QPainterPath, QLinearGradient, QBrush, QImage, QIcon, QDesktopServices
 from PyQt5.QtWidgets import QSpacerItem, QSizePolicy, QWidget, QVBoxLayout, QPushButton, QHBoxLayout
 from qfluentwidgets import SearchLineEdit, TitleLabel, SubtitleLabel, SingleDirectionScrollArea, FluentIcon
@@ -101,19 +102,18 @@ from PyQt5.QtWidgets import QLabel, QPushButton, QFrame, QGraphicsDropShadowEffe
 class ConferenceCard(QFrame):
     LIVING_ICON_PATH = ':/images/living.gif'
 
-    def __init__(self, title, avatar, id, parent=None):
+    conf_joined = pyqtSignal(int, str) # (id, title)
+
+    def __init__(self, title, creator, id, parent=None):
         '''
         title: str
         avatar: list[IconWidget]
-        id: str
+        id: int
         icon: str
         '''
         super().__init__(parent)
 
         self.id = id
-
-        avatar = AvatarWidget(self)
-        avatar.setText('Z')
 
         self.mainLayout = QVBoxLayout(self)
         self.mainLayout.setContentsMargins(20, 20, 20, 20)
@@ -163,18 +163,17 @@ class ConferenceCard(QFrame):
         self.creatorLabel.setStyleSheet('color: white;')
         self.creatorLabel.setAlignment(Qt.AlignCenter)
         self.creatorLabel.setFont(creatorFont)
+
+        self.creatorName = QLabel(creator, self)
+        self.creatorName.setStyleSheet('color: white;')
+        self.creatorName.setAlignment(Qt.AlignCenter)
+        self.creatorName.setFont(creatorFont)
         avatars_layout.setSpacing(10)
-        avatar.setRadius(20)
-        # avatar.setStyleSheet("border-radius: 20px; border: 2px solid white;")
-        avatar.setAlignment(Qt.AlignCenter)
-        avatar.setStyleSheet("""
-            border-radius: 20px;
-            border: 1px solid white;
-            """)
+
         self.livingLabel = ImageLabel(self.LIVING_ICON_PATH, self)
 
         avatars_layout.addWidget(self.creatorLabel, 0, Qt.AlignCenter)
-        avatars_layout.addWidget(avatar, 0, Qt.AlignCenter)
+        avatars_layout.addWidget(self.creatorName, 0, Qt.AlignCenter)
         avatars_layout.addWidget(self.livingLabel, 0, Qt.AlignCenter)
 
         self.bottomLayout.addLayout(avatars_layout)
@@ -256,7 +255,7 @@ class ConferenceCard(QFrame):
         w.cancelButton.setText('Cancel')
 
         if w.exec():
-            QDesktopServices.openUrl(QUrl('https://github.com'))
+            self.conf_joined.emit(self.id, self.titleLabel.text())
 
 class OwnedConferenceCard(ConferenceCard):
     def __init__(self, title, avatar, id, parent=None):
@@ -277,9 +276,23 @@ class OwnedConferenceCard(ConferenceCard):
 
         self.extraButton = QPushButton
 
+class ScrollArea(SingleDirectionScrollArea):
+
+    entered = pyqtSignal()
+
+    def __init__(self, parent=None, orient=Qt.Horizontal):
+        super().__init__(parent, orient)
+        self.setObjectName('conference-scroll-area')
+
+    def enterEvent(self, event):
+        self.entered.emit()
+        super().enterEvent(event)
 
 class HomeInterface(QFrame):
     ONLINE_ICON_PATH = ':/images/online.png'
+
+    scroll_area_entered = pyqtSignal()
+    search_edit_changed = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -289,6 +302,8 @@ class HomeInterface(QFrame):
         self.mainLayout = QVBoxLayout()
         self.mainLayout.setContentsMargins(20, 0, 20, 0)
         self.mainLayout.setSpacing(10)
+
+        self.srollWidth = 800
 
         # create a banner widget
         self.banner = BannerWidget(self)
@@ -322,22 +337,40 @@ class HomeInterface(QFrame):
                 background: #f9f9f9;
             }
         """)
+        self.meetingCardView = view
+        self.meetingCardView.setFixedSize(self.srollWidth, 200)
         layout = QHBoxLayout(view)
-        self.scrollArea = SingleDirectionScrollArea(self, orient=Qt.Horizontal)
+        self.scrollLayout = layout
+        self.scrollArea = ScrollArea()
         self.scrollArea.setFixedHeight(200)
         self.scrollArea.setObjectName('conference-scroll-area')
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(20)
 
-        # create 5 conference cards for testing
-        for i in range(5):
-            card = ConferenceCard(f'Conference {i}', [], uuid.uuid4(), self)
-            card.joinButton.clicked.connect(card.showMessageBox)
-            layout.addWidget(card)
+        # connect signals
+        self.scrollArea.entered.connect(self.scroll_area_entered)
 
         self.scrollArea.setWidget(view)
         self.scrollArea.setFrameShape(QFrame.NoFrame)
         self.mainLayout.addWidget(self.scrollArea)
+
+    def addConferenceCard(self, title, id, creator):
+        card = ConferenceCard(title, creator, id, self)
+        card.joinButton.clicked.connect(card.showMessageBox)
+        card_w = card.width()
+        if self.srollWidth > (card_w + 10) * self.scrollLayout.count():
+            self.srollWidth += card_w + 10 # 10 is the spacing
+        self.scrollLayout.addWidget(card, 0, Qt.AlignLeft)
+        self.meetingCardView.setFixedWidth(self.srollWidth)
+        self.meetingCardView.adjustSize()
+        return card
+
+    def removeConferenceCard(self, card: ConferenceCard):
+        card.deleteLater()
+        if self.srollWidth > 800 + card.width() + 10:
+            self.srollWidth -= card.width() + 10
+        self.meetingCardView.setFixedWidth(self.srollWidth)
+        self.meetingCardView.adjustSize()
 
     def info(self, info_level, title, msg, pos=InfoBarPosition.TOP, orient=Qt.Orientation.Horizontal):
         """
@@ -386,6 +419,9 @@ class HomeInterface(QFrame):
         else:
             raise ValueError('Invalid info_level')
 
+    def closeEvent(self, a0):
+        pass
+
 class MeetingConfigMessageBox(MessageBoxBase):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -397,65 +433,25 @@ class MeetingConfigMessageBox(MessageBoxBase):
         self.lineEdit.setPlaceholderText('Meeting name')
         self.warningLabel = BodyLabel('Meeting name cannot be empty', self)
 
-        self.selectHintLabel = BodyLabel('Please select the meeting type', self)
-
-        self.typeSingleButton = RadioButton('Single Mode', self)
-        self.singleFlag = False
-        self.typeMultipleButton = RadioButton('Multiple Mode', self)
-        self.multipleFlag = False
-        self._warningLabel = BodyLabel('Please select one of the meeting type', self)
-
-        _typeButtonGroup = QButtonGroup(self)
-        _typeButtonGroup.addButton(self.typeSingleButton)
-        _typeButtonGroup.addButton(self.typeMultipleButton)
-
-        _typeButtonGroup.buttonToggled.connect(lambda button, checked: self.changeSingleFlag() if button == self.typeSingleButton else self.changeMultipleFlag())
-
-        self.typeButtonGroup = _typeButtonGroup
-
         self.viewLayout.addWidget(self.titleLabel)
         self.viewLayout.addWidget(self.hintLabel)
         self.viewLayout.addWidget(self.lineEdit)
         self.viewLayout.addWidget(self.warningLabel)
-        self.viewLayout.addWidget(self.selectHintLabel)
-        self.viewLayout.addWidget(self.typeSingleButton)
-        self.viewLayout.addWidget(self.typeMultipleButton)
-        self.viewLayout.addWidget(self._warningLabel)
 
         self.warningLabel.hide()
-        self._warningLabel.hide()
 
         self.widget.setMinimumWidth(350)
 
     def meetingName(self):
         return self.lineEdit.text()
 
-    def meetingType(self):
-        return 'single' if self.singleFlag else 'multiple'
-
-    def changeSingleFlag(self):
-        """
-        handle single radio button is selected
-        """
-        self.singleFlag, self.multipleFlag = True, False
-
-    def changeMultipleFlag(self):
-        """
-        handle multiple radio button is selected
-        """
-        self.singleFlag, self.multipleFlag = False, True
 
     def validate(self) -> bool:
-        valid_1 = self.lineEdit.text() != ''
-        valid_2 = self.singleFlag ^ self.multipleFlag # only one of them is True
+        valid = self.lineEdit.text() != ''
 
-        if not valid_1:
+        if not valid:
             self.warningLabel.show()
         else:
             self.warningLabel.hide()
-        if not valid_2:
-            self._warningLabel.show()
-        else:
-            self._warningLabel.hide()
 
-        return valid_1 and valid_2
+        return valid
