@@ -1,6 +1,8 @@
 import json
 import threading
 
+from PyQt5.QtCore import pyqtSignal
+
 from DataTransfer.Video.Camera import Camera
 from DataTransfer.Video.VideoReceiver import VideoReceiver
 from DataTransfer.Video.VideoSender import VideoSender
