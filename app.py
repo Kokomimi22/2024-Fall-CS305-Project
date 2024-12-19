@@ -152,8 +152,7 @@ class AppController(QObject):
         self.send_video_stop()
 
         try:
-            conf_client.quit_conference()
-            conf_client.close_conference()
+            conf_client.quit_conference() # 退出会议
             conf_client.logout()  # 断开与服务器的连接
         except Exception as e:
             print(f"Error disconnecting from server: {e}")
