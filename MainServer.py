@@ -139,7 +139,8 @@ class MainServer:
                 }
             conference_server = self.conference_servers[conference_id]
             asyncio.run_coroutine_threadsafe(conference_server.stop(), conference_server.loop)
-            del self.conference_servers[conference_id]
+            if conference_id in self.conference_servers:
+                del self.conference_servers[conference_id]
             return {
                 'status': Status.SUCCESS.value
             }

@@ -101,7 +101,7 @@ class ConferenceServer:
     async def handle_video(self, data, addr):
         for client_addr in self.clients_addr['video'].values():
             self.transport['video'].sendto(data, client_addr)
-            print(f"Sending video data to {client_addr}")
+            #print(f"Sending video data to {client_addr}")
 
     async def log(self):
         try:

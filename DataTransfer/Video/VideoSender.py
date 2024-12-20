@@ -52,8 +52,10 @@ class VideoSender:
                 continue
             # 调整帧的分辨率
             frame = cv2.resize(frame, (camera_width, camera_height))
+            # 转换为RGB格式
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             # 转换为PyAV帧格式
-            av_frame = av.VideoFrame.from_ndarray(frame, format='bgr24')
+            av_frame = av.VideoFrame.from_ndarray(frame, format='rgb24')
 
             try:
                 # 编码帧

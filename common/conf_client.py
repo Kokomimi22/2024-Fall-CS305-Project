@@ -12,7 +12,7 @@ from util import *
 
 
 class ConferenceClient:
-    def __init__(self, app=None):
+    def __init__(self):
         # sync client
         self.userInfo: User = None
         self.recv_thread: Dict[str, threading.Thread] = {}
@@ -186,19 +186,19 @@ class ConferenceClient:
         self.recv_thread['text'] = threading.Thread(target=recv_task)
         self.recv_thread['text'].start()
 
-    def keep_recv_video(self):
-        """
-        running task: keep receiving video data
-        """
-        def recv_task():
-            while self.on_meeting:
-                _recv_data = self.videoReceiver.output_image()
-                if _recv_data:
-                    self.update_signal['video'].emit(_recv_data)
-                time.sleep(0.01)
-
-        self.recv_thread['video'] = threading.Thread(target=recv_task)
-        self.recv_thread['video'].start()
+    # def keep_recv_video(self):
+    #     """
+    #     running task: keep receiving video data
+    #     """
+    #     def recv_task():
+    #         while self.on_meeting:
+    #             _recv_data = self.videoReceiver.output_image()
+    #             if _recv_data:
+    #                 self.update_signal['video'].emit(_recv_data)
+    #             time.sleep(0.01)
+    #
+    #     self.recv_thread['video'] = threading.Thread(target=recv_task)
+    #     self.recv_thread['video'].start()
 
     def output_data(self):
         """
@@ -227,8 +227,7 @@ class ConferenceClient:
         self.keep_recv_text(self.conns['text'])
         # Establish connection with video data server
         self.conns['video'].sendall(json.dumps(init_request).encode())
-        self.videoReceiver = VideoReceiver(self.conns['video'])
-        self.keep_recv_video()
+        self.videoReceiver = VideoReceiver(self.conns['video'], self.update_signal['video'])
         self.videoReceiver.start()
 
     def close_conference(self):

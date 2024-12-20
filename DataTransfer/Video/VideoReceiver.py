@@ -1,5 +1,4 @@
 import math
-import queue
 import socket
 import struct
 import threading
@@ -8,14 +7,14 @@ import threading
 import av
 import cv2
 from PIL import Image
-
+from PyQt5.QtCore import pyqtSignal
 from config import *
 from util import overlay_camera_images
 
 
 class VideoReceiver:
-    def __init__(self, socket_connection: socket.socket):
-        self._display_thread = None
+    def __init__(self, socket_connection: socket.socket, update_signal: pyqtSignal(Image.Image)):
+        self.update_signal = update_signal
         self.sock = socket_connection
         self.sock.setblocking(False)
         self.buffers = {}
@@ -26,7 +25,6 @@ class VideoReceiver:
         self._thread = None
         # 用于存储解码器的字典
         self.decoders: Dict[str,  av.codec.context.CodecContext] = {}
-        self.gridimage_queue = queue.Queue()  # 线程安全队列
 
     @staticmethod
     def _unpack_data(data):
@@ -97,7 +95,7 @@ class VideoReceiver:
                     frames = decoder.decode(packet)
                     for frame in frames:
                         # 转换为numpy数组
-                        img = frame.to_ndarray(format='bgr24')
+                        img = frame.to_ndarray(format='rgb24')
                         self.frames[client_id] = img
 
                         # 显示所有摄像头画面
@@ -105,10 +103,9 @@ class VideoReceiver:
                         if camera_images:
                             grid_size = int(math.ceil(math.sqrt(len(camera_images))))
                             grid_image = overlay_camera_images(camera_images, (grid_size, grid_size))
-                            cv2.imshow('Video Grid', grid_image)
+                            #cv2.imshow('Video Grid', grid_image)
                             grid_image_pil = Image.fromarray(grid_image)
-                            self.gridimage_queue.put(grid_image_pil)
-
+                            self.update_signal.emit(grid_image_pil)
                             if cv2.waitKey(1) & 0xFF == ord('q'):
                                 self._running = False
                                 break
@@ -131,16 +128,12 @@ class VideoReceiver:
             grid_size = int(math.ceil(math.sqrt(len(camera_images))))
             grid_image = overlay_camera_images(camera_images, (grid_size, grid_size))
             grid_image_pil = Image.fromarray(grid_image)
-            self.gridimage_queue.put(grid_image_pil)
+            self.update_signal.emit(grid_image_pil)
         else:
-            self.gridimage_queue.put(Image.new('RGB', (640, 480)))
+            self.update_signal.emit(Image.new('RGB', (640, 480)))
             print("No camera images to display")
         if not self.frames:
             cv2.destroyAllWindows()
-
-    def output_image(self):
-        if self.gridimage_queue.qsize() > 0:
-            return self.gridimage_queue.get()
 
     def clear(self):
         self.decoders.clear()
@@ -148,7 +141,6 @@ class VideoReceiver:
         self.expected_sequences.clear()
         self.received_chunks.clear()
         self.frames.clear()
-        self.gridimage_queue.queue.clear()
 
     def start(self):
         if self._running:

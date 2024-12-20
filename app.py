@@ -113,6 +113,9 @@ class AppController(QObject):
     def send_video_stop(self):
         conf_client.stop_video_sender()
 
+    def send_video_switch_mode(self):
+        conf_client.switch_video_mode()
+
     def send_audio_start(self):
         # TODO: start AudioSender
         pass
@@ -275,6 +278,7 @@ class HomeController:
                 user_view = conf_client.user()
                 self.meetingController = MeetingController(self.meetingInterface, self.app, user_view, isOwned=True)
                 self._init_signal_connection()
+                self.app.mainui.hide()
                 self.meetingInterface.show()
             else:
                 self.interface.info('error', 'Error', 'Failed to create meeting')
@@ -302,6 +306,7 @@ class HomeController:
                 user_view = conf_client.user()
                 self.meetingController = MeetingController(self.meetingInterface, self.app, user_view, isOwned=False)
                 self._init_signal_connection()
+                self.app.mainui.hide()
                 self.meetingInterface.show()
             else:
                 self.interface.info('error', 'Error', 'Failed to join meeting')
