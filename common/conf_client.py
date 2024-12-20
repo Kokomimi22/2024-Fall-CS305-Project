@@ -2,12 +2,16 @@ import json
 import threading
 
 from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore.QUrl import userInfo
 
 from DataTransfer.Audio.AudioReceiver import AudioReceiver
 from DataTransfer.Audio.AudioSender import AudioSender
+from DataTransfer.Text.TextReceiver import TextReceiver
+from DataTransfer.Text.TextSender import TextSender
 from DataTransfer.Video.Camera import Camera
 from DataTransfer.Video.VideoReceiver import VideoReceiver
 from DataTransfer.Video.VideoSender import VideoSender
+from Protocol.DistributeProtocol import ProtocolInitialFormat
 from common.user import User
 from util import *
 
@@ -33,7 +37,10 @@ class ConferenceClient:
         self.videoReceiver: VideoReceiver = None
         self.audioSender: AudioSender = None
         self.audioReceiver: AudioReceiver = None
+        self.textSender: TextSender = None
+        self.textReceiver: TextReceiver = None
         self.update_signal = None
+        self.local_conns = {} # for p2p connection bind
 
     def user(self):
         return self.userInfo
@@ -158,36 +165,7 @@ class ConferenceClient:
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
             return
-        message_post = {
-            'type': MessageType.TEXT_MESSAGE.value,
-            'sender_name': self.userInfo.username,
-            'message': message
-        }
-        self.conns['text'].sendall(json.dumps(message_post).encode())
-
-    def keep_recv_text(self, recv_conn: socket.socket = None):
-        """
-        running task: keep receiving certain type of data (save or output)
-        you can create other functions for receiving various kinds of data
-        """
-        def recv_task():
-            while self.on_meeting:
-                _recv_data = recv_conn.recv(DATA_LINE_BUFFER)
-                if _recv_data == b'Quitted' or _recv_data == b'Cancelled':
-                    print(f'You have been quitted from the conference {self.conference_id}')
-                    self.close_conference()
-                    break
-                if _recv_data:
-                    try:
-                        message = json.loads(_recv_data.decode())
-                        if message['type'] == MessageType.TEXT_MESSAGE.value and self.update_signal.get('text'):
-                            self.update_signal['text'].emit(message['sender_name'], message['message'])
-                            print(f'{message["sender_name"]}: {message["message"]}')
-                    except UnicodeDecodeError:
-                        print(f'[Info]: Received data: {len(_recv_data)} bytes')
-
-        self.recv_thread['text'] = threading.Thread(target=recv_task)
-        self.recv_thread['text'].start()
+        self.textSender.send(self.userInfo.username, message)
 
     def output_data(self):
         """
@@ -208,23 +186,25 @@ class ConferenceClient:
         self.conns['text'].connect(self.conf_server_addr)
         self.conns['video'].connect(self.data_server_addr['video'])
         self.conns['audio'].connect(self.data_server_addr['audio'])
-        init_request = {
-            'type': MessageType.INIT.value,
-            'client_id': self.userInfo.uuid
-        }
+        init_request = ProtocolInitialFormat(
+            {data_type: self.local_conns[data_type].getsockname() for data_type in self.support_data_types},
+            self.userInfo.uuid,
+        ).pack()
         # Establish connection with text data server
         self.conns['text'].sendall(json.dumps(init_request).encode())
         # start receiving text data
-        self.keep_recv_text(self.conns['text'])
         # Establish connection with video data server
         self.conns['video'].sendall(json.dumps(init_request).encode())
         self.conns['audio'].sendall(json.dumps(init_request).encode())
         self.videoReceiver = VideoReceiver(self.conns['video'], self.update_signal['video'])
         self.audioReceiver = AudioReceiver(self.conns['audio'], streamout)
         self.audioSender = AudioSender(self.conns['audio'], self.userInfo.uuid, streamin)
+        self.textSender = TextSender(self.conns['text'])
+        self.textReceiver = TextReceiver(self.conns['text'], self.update_signal['text'])
         self.videoReceiver.start()
         self.audioReceiver.start()
         self.audioSender.start()
+        self.textReceiver.start()
 
     def close_conference(self):
         """
@@ -251,6 +231,9 @@ class ConferenceClient:
                 if self.audioReceiver:
                     self.audioReceiver.terminate()
                     self.audioReceiver = None
+                if self.textReceiver:
+                    self.textReceiver.terminate()
+                    self.textReceiver = None
                 for conn in self.conns.values():
                     conn.shutdown(socket.SHUT_RDWR)
             except socket.error as e:
@@ -370,4 +353,17 @@ class ConferenceClient:
             'audio': app.audio_received  # type: pyqtSignal(bytes)
         }  # {data_type: handler} for GUI update
 
+    def init_local_conns(self):
+        for data_type in self.support_data_types:
+            self.local_conns[data_type] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.local_conns[data_type].bind(('localhost', get_available_port()))
+
+    def handle_protocol_upgrade(self):
+
+        def recv_data(conn):
+            while self.on_meeting:
+                data = conn.recv(CONTROL_LINE_BUFFER)
+                if not data:
+                    break
+                upgrade_request = json.loads(data.decode())
 

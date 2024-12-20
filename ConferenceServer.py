@@ -1,7 +1,9 @@
 import asyncio
-from codecs import StreamWriter, StreamReader
+from asyncio import StreamReader, StreamWriter
 
+from DataTransfer.Text.CacheableServer import TextServer
 from Protocol.AudioProtocol import AudioProtocol
+from Protocol.DistributeProtocol import DistributeProtocol, ProtocolInitialFormat
 from Protocol.VideoProtocol import VideoProtocol
 from common.user import *
 
@@ -24,10 +26,12 @@ class ConferenceServer:
         ,it is used to store the address of the client when transmitting screen, camera, and audio data
         """
         self.clients_addr = {datatype: {} for datatype in self.data_types}
-        self.mode = 'Client-Server'
+        self.mode = DistributeProtocol.PEER_TO_PEER
         self.running = True
         self.loop = asyncio.new_event_loop()
         self.main_server = main_server
+        self.text_server = TextServer()
+        self.client_local_addr = {}
 
     def get_info(self):
         return {
@@ -36,6 +40,12 @@ class ConferenceServer:
             'manager_id': self.manager_id,
             'mode': self.mode
         }
+
+    def add_client_local_addr(self, client_writer: StreamWriter, local_addrs):
+        self.client_local_addr[client_writer] = local_addrs
+
+    def remove_client_local_addr(self, client_writer):
+        self.client_local_addr.pop(client_writer, None)
 
     async def handle_client(self, reader: StreamReader, writer: StreamWriter):
         """
@@ -57,10 +67,12 @@ class ConferenceServer:
                 if request['type'] == MessageType.QUIT.value:
                     break
                 elif request['type'] == MessageType.INIT.value:
-                    client_id = request['client_id']
+                    local_addr, client_id = ProtocolInitialFormat.unpack(request)
+                    self.add_client_local_addr(writer, local_addr)
+                    await self.text_server.emitCache(writer)
                 elif request['type'] == MessageType.TEXT_MESSAGE.value:
-                    sender_name = request.get('sender_name', 'undefined')
-                    await self.emit_message(request['message'], sender_name, writer)
+                    self.text_server.update_clients([self.client_conns_text.values()])
+                    await self.text_server.emit(data, writer)
                 else:
                     print(f"Unknown message: {message}")
         except asyncio.CancelledError:
@@ -85,20 +97,6 @@ class ConferenceServer:
                 print(f"Client {addr} has left the conference.")
             if self.running and client_id == self.manager_id:
                 await self.stop()
-
-    async def emit_message(self, message: str, sender_name: str, sender: StreamWriter):
-        """
-        Send a message to all clients in the conference.
-        """
-        emit_message = {
-            'type': MessageType.TEXT_MESSAGE.value,
-            'message': message,
-            'sender_name': sender_name
-        }
-        for client_reader, client_writer in self.client_conns_text.values():
-            if client_writer != sender:
-                client_writer.write(json.dumps(emit_message).encode())
-                await client_writer.drain()
 
     async def handle_video(self, data, addr):
         for client_addr in self.clients_addr['video'].values():

@@ -29,6 +29,8 @@ class AudioReceiver:
         self._thread = threading.Thread(target=self._recv_audio)
         self._thread.start()
 
+    def switch_socket(self, socket_connection: socket.socket):
+        self.client_socket = socket_connection
 
     def terminate(self):
         if not self._running:

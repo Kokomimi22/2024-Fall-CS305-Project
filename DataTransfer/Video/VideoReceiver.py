@@ -103,7 +103,6 @@ class VideoReceiver:
                         if camera_images:
                             grid_size = int(math.ceil(math.sqrt(len(camera_images))))
                             grid_image = overlay_camera_images(camera_images, (grid_size, grid_size))
-                            #cv2.imshow('Video Grid', grid_image)
                             grid_image_pil = Image.fromarray(grid_image)
                             self.update_signal.emit(grid_image_pil)
                             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -133,7 +132,7 @@ class VideoReceiver:
             self.update_signal.emit(Image.new('RGB', (640, 480)))
             print("No camera images to display")
         if not self.frames:
-            cv2.destroyAllWindows()
+            print("No more clients connected")
 
     def clear(self):
         self.decoders.clear()
@@ -149,10 +148,12 @@ class VideoReceiver:
         self._thread = threading.Thread(target=self._process_data)
         self._thread.start()
 
+    def switch_socket(self, socket_connection: socket.socket):
+        self.sock = socket_connection
+
     def terminate(self):
         if not self._running:
             return
         self._running = False
         self._thread.join()
-        cv2.destroyAllWindows()
         self.clear()
