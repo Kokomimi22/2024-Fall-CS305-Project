@@ -26,7 +26,7 @@ class Work(QThread):
             if not self.currentVideoSource:
                 return
             elif isinstance(self.currentVideoSource, Desktop):
-                img = capture_screen().toqimage()  # return QImage
+                img = qcapture_screen()
                 self.trigger.emit(img.copy())
             else:
                 self.cameraCapture.capture()

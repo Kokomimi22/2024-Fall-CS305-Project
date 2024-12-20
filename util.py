@@ -11,6 +11,7 @@ import cv2
 import pyautogui
 import numpy as np
 from PIL import Image, ImageGrab
+from PyQt5.QtGui import QGuiApplication, QImage
 from PyQt5.QtMultimedia import QCameraInfo, QAudioDeviceInfo, QAudio, QCamera, QCameraImageCapture, QAudioInput, \
     QAudioFormat
 from deprecated.sphinx import deprecated
@@ -109,6 +110,12 @@ def overlay_camera_images(camera_images: List[np.array], grid_size=(2, 2)):
         grid_image[y:y + cell_height, x:x + cell_width] = camera_image
 
     return grid_image
+
+def qcapture_screen():
+    screen = QGuiApplication.primaryScreen()
+    if screen:
+        return screen.grabWindow(0).toImage()
+
 
 def capture_screen():
     try:
