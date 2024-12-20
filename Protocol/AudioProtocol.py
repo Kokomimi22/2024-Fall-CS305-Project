@@ -1,8 +1,8 @@
 import asyncio
 import json
 from asyncio import DatagramProtocol
-
-from config import MessageType
+import numpy as np
+from config import MessageType, CHUNK
 
 
 class AudioProtocol(DatagramProtocol):
@@ -12,11 +12,12 @@ class AudioProtocol(DatagramProtocol):
         asyncio.create_task(self.handle_data(data, addr))
 
     async def handle_data(self, data, addr):
-        if addr not in self.server.clients_addr['video'].values():
+        if addr not in self.server.clients_addr['audio'].values():
             request = json.loads(data.decode())
+            client_id = request['client_id']
             if request.get('type') == MessageType.INIT.value:
-                client_id = request['client_id']
-                self.server.clients_addr['video'][client_id] = addr
+                self.server.clients_addr['audio'][client_id] = addr
+                self.server.mixed_audio_buffer[addr] = np.zeros(CHUNK, dtype=np.int16)
             return
-        await self.server.handle_video(data, addr)
+        await self.server.handle_audio(data, addr)
 

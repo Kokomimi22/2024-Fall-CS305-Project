@@ -8,16 +8,22 @@ class ClientCLI:
         """
         execute functions based on the command line input
         """
-        while True:
-            if not self.client.on_meeting:
-                status = 'Free'
-            else:
-                status = f'OnMeeting-{self.client.conference_id}'
+        try:
+            while True:
+                if not self.client.on_meeting:
+                    status = 'Free'
+                else:
+                    status = f'OnMeeting-{self.client.conference_id}'
 
-            cmd_input = input(f'({status}) Please enter a operation (enter "?" to help): ')
-            continue_flag = self.command_parser(cmd_input)
-            if not continue_flag:
-                break
+                cmd_input = input(f'({status}) Please enter a operation (enter "?" to help): ')
+                continue_flag = self.command_parser(cmd_input)
+                if not continue_flag:
+                    break
+        except Exception as e:
+            print(f'[Error]: {e}')
+        finally:
+            if self.client.userInfo:
+                self.client.logout()
 
     def command_parser(self, cmd_input):
         """
@@ -63,11 +69,15 @@ class ClientCLI:
                     self.client.start_video_sender('camera')
                 elif arg == 'screen':
                     self.client.start_video_sender('screen')
+                elif arg == 'audio':
+                    self.client.start_send_audio()
                 else:
                     print('[Error]: Invalid command' + '\r\n' + HELP)
             elif fields[0] == 'off':
                 if arg == 'video':
                     self.client.stop_video_sender()
+                elif arg == 'audio':
+                    self.client.stop_send_audio()
                 else:
                     print('[Error]: Invalid command' + '\r\n' + HELP)
             else:
