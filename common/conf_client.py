@@ -1,9 +1,10 @@
 import json
 import threading
-import time
 
 from PyQt5.QtCore import pyqtSignal
 
+from DataTransfer.Audio.AudioReceiver import AudioReceiver
+from DataTransfer.Audio.AudioSender import AudioSender
 from DataTransfer.Video.Camera import Camera
 from DataTransfer.Video.VideoReceiver import VideoReceiver
 from DataTransfer.Video.VideoSender import VideoSender
@@ -30,6 +31,8 @@ class ConferenceClient:
         self.recv_data = None  # you may need to save received streamd data from other clients in conference
         self.videoSender: VideoSender = None  # you may need to maintain multiple video senders for a single conference
         self.videoReceiver: VideoReceiver = None
+        self.audioSender: AudioSender = None
+        self.audioReceiver: AudioReceiver = None
         self.update_signal = None
 
     def user(self):
@@ -115,7 +118,7 @@ class ConferenceClient:
 
     def quit_conference(self):
         """
-        quit your on-going conference
+        quit your ongoing conference
         """
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
@@ -128,7 +131,7 @@ class ConferenceClient:
 
     def cancel_conference(self):
         """
-        cancel your on-going conference (when you are the conference manager): ask server to close all clients
+        cancel your ongoing conference (when you are the conference manager): ask server to close all clients
         """
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
@@ -186,20 +189,6 @@ class ConferenceClient:
         self.recv_thread['text'] = threading.Thread(target=recv_task)
         self.recv_thread['text'].start()
 
-    # def keep_recv_video(self):
-    #     """
-    #     running task: keep receiving video data
-    #     """
-    #     def recv_task():
-    #         while self.on_meeting:
-    #             _recv_data = self.videoReceiver.output_image()
-    #             if _recv_data:
-    #                 self.update_signal['video'].emit(_recv_data)
-    #             time.sleep(0.01)
-    #
-    #     self.recv_thread['video'] = threading.Thread(target=recv_task)
-    #     self.recv_thread['video'].start()
-
     def output_data(self):
         """
         running task: output received stream data
@@ -215,8 +204,10 @@ class ConferenceClient:
         """
         self.conns['text'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.conns['video'] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.conns['audio'] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.conns['text'].connect(self.conf_server_addr)
         self.conns['video'].connect(self.data_server_addr['video'])
+        self.conns['audio'].connect(self.data_server_addr['audio'])
         init_request = {
             'type': MessageType.INIT.value,
             'client_id': self.userInfo.uuid
@@ -227,8 +218,13 @@ class ConferenceClient:
         self.keep_recv_text(self.conns['text'])
         # Establish connection with video data server
         self.conns['video'].sendall(json.dumps(init_request).encode())
+        self.conns['audio'].sendall(json.dumps(init_request).encode())
         self.videoReceiver = VideoReceiver(self.conns['video'], self.update_signal['video'])
+        self.audioReceiver = AudioReceiver(self.conns['audio'], streamout)
+        self.audioSender = AudioSender(self.conns['audio'], self.userInfo.uuid, streamin)
         self.videoReceiver.start()
+        self.audioReceiver.start()
+        self.audioSender.start()
 
     def close_conference(self):
         """
@@ -249,6 +245,12 @@ class ConferenceClient:
                 for send_thread in self.send_thread.values():
                     if send_thread is not threading.current_thread():
                         send_thread.join()
+                if self.audioSender:
+                    self.audioSender.terminate()
+                    self.audioSender = None
+                if self.audioReceiver:
+                    self.audioReceiver.terminate()
+                    self.audioReceiver = None
                 for conn in self.conns.values():
                     conn.shutdown(socket.SHUT_RDWR)
             except socket.error as e:
@@ -296,6 +298,26 @@ class ConferenceClient:
         else:
             print(f'[Error]: Video sender is not started')
 
+    def start_send_audio(self):
+        """
+        start audio sender for sharing audio data
+        """
+        if not self.on_meeting:
+            print(f'[Error]: You are not in a conference')
+            return
+        if self.audioSender:
+            self.audioSender.sending = True
+
+    def stop_send_audio(self):
+        """
+        stop audio sender for sharing audio data
+        """
+        if not self.on_meeting:
+            print(f'[Error]: You are not in a conference')
+            return
+        if self.audioSender:
+            self.audioSender.sending = False
+
     def register(self, username, password):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
@@ -325,6 +347,9 @@ class ConferenceClient:
             return response
 
     def logout(self):
+        if not self.userInfo:
+            print(f'[Error]: You are not logged in')
+            return
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
             message = json.dumps({'type': MessageType.LOGOUT.value, 'client_id': self.userInfo.uuid})

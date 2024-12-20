@@ -1,6 +1,7 @@
 import asyncio
 from codecs import StreamWriter, StreamReader
 
+from Protocol.AudioProtocol import AudioProtocol
 from Protocol.VideoProtocol import VideoProtocol
 from common.user import *
 
@@ -15,6 +16,7 @@ class ConferenceServer:
         self.conf_serve_port: int = conf_serve_port
         self.data_serve_ports = {}
         self.data_types: List[str] = ['video', 'audio', 'text']
+        self.mixed_audio_buffer = {}
         self.clients_info = []
         self.client_conns_text = {} # self.client_conns_text[addr] = (reader, writer), This is for text data like quit, init, and text message
         """
@@ -103,6 +105,17 @@ class ConferenceServer:
             self.transport['video'].sendto(data, client_addr)
             #print(f"Sending video data to {client_addr}")
 
+    async def handle_audio(self, data, addr):
+        for client_addr in self.clients_addr['audio'].values():
+            # if client_addr == addr:
+            #     continue
+            data = data.ljust(CHUNK * 2, b'\x00')
+            mixed_audio = np.add(self.mixed_audio_buffer[client_addr], np.frombuffer(data, dtype=np.int16), casting="unsafe")
+            mixed_audio = np.clip(mixed_audio, -32768, 32767)
+            self.mixed_audio_buffer[client_addr] = mixed_audio
+        self.transport['audio'].sendto(self.mixed_audio_buffer[addr].tobytes(), addr)
+        self.mixed_audio_buffer[addr] = np.zeros(CHUNK, dtype=np.int16)
+
     async def log(self):
         try:
             while self.running:
@@ -140,8 +153,13 @@ class ConferenceServer:
             lambda: VideoProtocol(self),
             local_addr=('127.0.0.1', self.data_serve_ports['video'])
         )
+        audio_server_coro = self.loop.create_datagram_endpoint(
+            lambda: AudioProtocol(self),
+            local_addr=('127.0.0.1', self.data_serve_ports['audio'])
+        )
         server = self.loop.run_until_complete(server_coro)
         self.transport['video'], _ = self.loop.run_until_complete(video_server_coro)
+        self.transport['audio'], _ = self.loop.run_until_complete(audio_server_coro)
         self.loop.create_task(self.log())
         try:
             self.loop.run_forever()
