@@ -29,8 +29,11 @@ class AudioSender:
         self._thread.start()
 
     def terminate(self):
+        try:
+            self.server_socket.send(b'END')
+        except OSError:
+            pass
         if not self._running:
             return None
         self._running = False
         self._thread.join()
-        self.server_socket.send(b'END')

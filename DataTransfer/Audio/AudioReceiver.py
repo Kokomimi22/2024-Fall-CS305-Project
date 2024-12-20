@@ -9,6 +9,7 @@ class AudioReceiver:
     def __init__(self, socket_connection: socket.socket, stream_out: pyaudio.Stream):
         self.stream = stream_out
         self.client_socket = socket_connection
+        self.client_socket.setblocking(False)
         self._running = False
         self._thread = None
 
@@ -18,9 +19,12 @@ class AudioReceiver:
                 data, _ = self.client_socket.recvfrom(CHUNK * 2)
                 if not data:
                     break
-                self.stream.write(data)
-            except OSError as e:
+            except BlockingIOError:
+                continue
+            except OSError:
                 break
+            self.stream.write(data)
+
 
     def start(self):
         if self._running:

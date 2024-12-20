@@ -26,7 +26,7 @@ class VideoProtocol(DatagramProtocol):
         chunk_data = data[offset:]
         if chunk_data == b'TERMINATE':
             self.server.clients_addr['video'].pop(client_id, None)
-        await self.server.handle_video(data, addr)
+        await self.server.handle_video(data)
 
 
 

@@ -58,12 +58,11 @@ class VideoReceiver:
                     break
             except BlockingIOError:
                 continue
-            except ConnectionResetError:
-                print("Connection reset by the server")
+            except OSError:
                 break
             client_id, data_len, sequence_number, chunk_data = self._unpack_data(data)
 
-            if chunk_data == b'TERMINATE' or chunk_data == b'OFF':
+            if chunk_data == b'TERMINATE' or chunk_data == b'END':
                 self.remove_client(client_id)
                 continue
 
@@ -132,8 +131,8 @@ class VideoReceiver:
         else:
             self.update_signal.emit(Image.new('RGB', (640, 480)))
             print("No camera images to display")
-        if not self.frames:
-            cv2.destroyAllWindows()
+        # if not self.frames:
+        #     cv2.destroyAllWindows()
 
     def clear(self):
         self.decoders.clear()

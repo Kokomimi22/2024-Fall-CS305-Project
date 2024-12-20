@@ -50,9 +50,11 @@ class Camera:
             self.mode = 'camera'
 
     def stop(self):
-        if self.running:
-            self.running = False
-            self.thread.join()
-            with self.lock:
-                self.frame = (False, None)
+        if not self.running:
+            return
+        self.running = False
+        self.thread.join()
+        with self.lock:
+            self.frame = (False, None)
+        if self.mode == 'camera':
             release_camera()

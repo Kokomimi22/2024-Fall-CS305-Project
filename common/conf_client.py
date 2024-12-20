@@ -23,7 +23,8 @@ class ConferenceClient:
         self.data_server_addr: Dict[str, Any] = None  # data server in the conference server
         self.on_meeting = False  # status
         self.conns: Dict[str, socket.socket] = {}  # you may need to maintain multiple conns for a single conference
-        self.support_data_types = ['video', 'audio', 'text']  # the data types that can be shared, which should be modified
+        self.support_data_types = ['video', 'audio',
+                                   'text']  # the data types that can be shared, which should be modified
         self.share_data = {}
         self.sharing_task = None
         self.conference_info = None  # you may need to save and update some conference_info regularly
@@ -33,7 +34,7 @@ class ConferenceClient:
         self.videoReceiver: VideoReceiver = None
         self.audioSender: AudioSender = None
         self.audioReceiver: AudioReceiver = None
-        self.update_signal = None
+        self.update_signal = {dataType: None for dataType in self.support_data_types}  # signal for updating GUI
 
     def user(self):
         return self.userInfo
@@ -170,6 +171,7 @@ class ConferenceClient:
         running task: keep receiving certain type of data (save or output)
         you can create other functions for receiving various kinds of data
         """
+
         def recv_task():
             while self.on_meeting:
                 _recv_data = recv_conn.recv(DATA_LINE_BUFFER)
@@ -219,6 +221,7 @@ class ConferenceClient:
         # Establish connection with video data server
         self.conns['video'].sendall(json.dumps(init_request).encode())
         self.conns['audio'].sendall(json.dumps(init_request).encode())
+        self.videoSender = VideoSender(None, self.conns['video'], self.userInfo.uuid)
         self.videoReceiver = VideoReceiver(self.conns['video'], self.update_signal['video'])
         self.audioReceiver = AudioReceiver(self.conns['audio'], streamout)
         self.audioSender = AudioSender(self.conns['audio'], self.userInfo.uuid, streamin)
@@ -234,23 +237,18 @@ class ConferenceClient:
         self.on_meeting = False
         if self.conns:
             try:
-                if self.videoSender:
-                    self.videoSender.terminate()
-                    self.videoSender = None
-                for recv_thread in self.recv_thread.values():
-                    if recv_thread is not threading.current_thread():
-                        recv_thread.join()
-                if self.videoReceiver:
-                    self.videoReceiver.terminate()
-                for send_thread in self.send_thread.values():
-                    if send_thread is not threading.current_thread():
-                        send_thread.join()
-                if self.audioSender:
-                    self.audioSender.terminate()
-                    self.audioSender = None
-                if self.audioReceiver:
-                    self.audioReceiver.terminate()
-                    self.audioReceiver = None
+                # Terminate video and audio senders/receivers if they exist
+                for attr in ['videoSender', 'videoReceiver', 'audioSender', 'audioReceiver']:
+                    instance = getattr(self, attr, None)
+                    if instance:
+                        instance.terminate()
+                        setattr(self, attr, None)
+
+                # Join send and receive threads if they are not the current thread
+                for thread_dict in [self.send_thread, self.recv_thread]:
+                    for thread in thread_dict.values():
+                        if thread is not threading.current_thread():
+                            thread.join()
                 for conn in self.conns.values():
                     conn.shutdown(socket.SHUT_RDWR)
             except socket.error as e:
@@ -267,7 +265,7 @@ class ConferenceClient:
         """
         switch video mode between camera and screen
         """
-        if not self.videoSender:
+        if not self.videoSender.isRunning():
             print(f'[Error]: Video sender is not started')
             return
         self.videoSender.switch_mode()
@@ -279,12 +277,12 @@ class ConferenceClient:
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
             return
-        if self.videoSender:
+        if self.videoSender.isRunning():
             print(f'[Error]: Video sender is already started. ' +
-                  'I guess you want to switch video mode, please use switch_video_mode command')
+                  'I guess you want to switch video mode, please use "switch_video_mode" command')
             return
         camera = Camera(mode)
-        self.videoSender = VideoSender(camera, self.conns['video'], self.userInfo.uuid)
+        self.videoSender.camera = camera
         print(f'[Info]: Start video sender in {mode} mode')
         self.videoSender.start()
 
@@ -292,9 +290,8 @@ class ConferenceClient:
         """
         stop video sender for sharing camera data
         """
-        if self.videoSender:
-            self.videoSender.terminate(quitConf=False)
-            self.videoSender = None
+        if self.videoSender.isRunning():
+            self.videoSender.stop_video_send()
         else:
             print(f'[Error]: Video sender is not started')
 
@@ -350,6 +347,8 @@ class ConferenceClient:
         if not self.userInfo:
             print(f'[Error]: You are not logged in')
             return
+        if self.on_meeting:
+            self.quit_conference()
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
             message = json.dumps({'type': MessageType.LOGOUT.value, 'client_id': self.userInfo.uuid})
@@ -369,5 +368,3 @@ class ConferenceClient:
             'video': app.video_received,  # type: pyqtSignal(Image)
             'audio': app.audio_received  # type: pyqtSignal(bytes)
         }  # {data_type: handler} for GUI update
-
-

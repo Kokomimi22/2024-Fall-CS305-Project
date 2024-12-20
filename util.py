@@ -118,9 +118,6 @@ def capture_screen():
         # Convert the screenshot to a numpy array
         frame = np.array(screenshot)
 
-        # Convert the color space from RGB to BGR (which OpenCV uses)
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-
         return True, frame
     except Exception as e:
         print(f"Failed to capture screen: {e}")
@@ -131,6 +128,7 @@ def capture_camera()->np.array:
     ret, frame = cap.read()
     if not ret:
         raise Exception('Fail to capture frame from camera')
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     return ret, frame
 
 def release_camera():

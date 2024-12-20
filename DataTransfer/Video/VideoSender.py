@@ -20,6 +20,9 @@ class VideoSender:
         # 初始化编码器
         self.codec_context = self._create_codec_context()
 
+    def isRunning(self):
+        return self._running
+
     def _create_codec_context(self):
 
         # 创建内存缓冲区作为输出容器
@@ -34,7 +37,7 @@ class VideoSender:
 
         # 设置编码器参数
         stream.options = {
-            'preset': 'ultrafast',  # 最快的编码速度
+            'preset': 'fast',  # 较快的编码速度
             'tune': 'zerolatency',  # 最低延迟
             'x264-params': 'nal-hrd=cbr:force-cfr=1',  # 固定比特率
             'crf': '23',  # 压缩质量（0-51，23为默认值）
@@ -52,8 +55,6 @@ class VideoSender:
                 continue
             # 调整帧的分辨率
             frame = cv2.resize(frame, (camera_width, camera_height))
-            # 转换为RGB格式
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             # 转换为PyAV帧格式
             av_frame = av.VideoFrame.from_ndarray(frame, format='rgb24')
 
@@ -94,9 +95,10 @@ class VideoSender:
         self._thread = threading.Thread(target=self._process_data)
         self._thread.start()
 
-    def stop(self):
+    def stop_running(self):
         self._running = False
-        self._thread.join()
+        if self._thread:
+            self._thread.join()
         # 刷新编码器缓冲区
         if self.codec_context:
             try:
@@ -106,26 +108,43 @@ class VideoSender:
                     self.sock.send(encoded_data)
             except Exception as e:
                 print(f"Error flushing encoder: {e}")
-        self.camera.stop()
+        if self.camera:
+            self.camera.stop()
 
     def switch_mode(self):
         self.camera.switch_mode()
 
-    def terminate(self, quitConf: bool=True):
+    def terminate(self):
         """
         终止视频发送, quitConf为False时就是关闭视频发送，为True时是直接退出会议
         :param quitConf: bool
         :return:
         """
-        if not self._running:
-            return None
-        self.stop()
+        if self._running:
+            self.stop_running()
         terminate_signal = (struct.pack("I", len(self.client_id)) +
                             self.client_id +
                             struct.pack("Q", 0) +
                             struct.pack("I", 0) +
-                            (b'TERMINATE' if quitConf else b'OFF'))
+                            b'TERMINATE')
         try:
             self.sock.send(terminate_signal)
+        except OSError:
+            pass
+
+    def stop_video_send(self):
+        if not self._running:
+            return None
+        self.stop_running()
+        self.camera = None
+        self._thread = None
+        self.codec_context = self._create_codec_context()
+        stop_signal = (struct.pack("I", len(self.client_id)) +
+                            self.client_id +
+                            struct.pack("Q", 0) +
+                            struct.pack("I", 0) +
+                            b'END')
+        try:
+            self.sock.send(stop_signal)
         except OSError:
             pass

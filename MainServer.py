@@ -41,8 +41,7 @@ class MainServer:
             client_id,
             conference_id,
             conference_port,
-            conference_name,
-            self)
+            conference_name)
         # 为会议服务器的每个数据服务器生成端口号
         for dataType in conference_server.data_types:
             conference_server.data_serve_ports[dataType] = get_port()

@@ -1,4 +1,5 @@
 import asyncio
+from asyncio import AbstractEventLoop
 from codecs import StreamWriter, StreamReader
 
 from Protocol.AudioProtocol import AudioProtocol
@@ -7,7 +8,7 @@ from common.user import *
 
 
 class ConferenceServer:
-    def __init__(self, manager_id: str, conference_id: int, conf_serve_port: int, conference_name: str, main_server: 'MainServer'):
+    def __init__(self, manager_id: str, conference_id: int, conf_serve_port: int, conference_name: str):
         self.transport: Dict[str, asyncio.DatagramTransport] = {} # self.transport[datatype] = transport
         # the uuid of the manager of the conference
         self.manager_id: str = manager_id  # str(uuid)
@@ -24,10 +25,9 @@ class ConferenceServer:
         ,it is used to store the address of the client when transmitting screen, camera, and audio data
         """
         self.clients_addr = {datatype: {} for datatype in self.data_types}
-        self.mode = 'Client-Server'
-        self.running = True
-        self.loop = asyncio.new_event_loop()
-        self.main_server = main_server
+        self.mode: str = DataTransferMode.CS.value
+        self.running: bool = True
+        self.loop: AbstractEventLoop = asyncio.new_event_loop()
 
     def get_info(self):
         return {
@@ -100,7 +100,7 @@ class ConferenceServer:
                 client_writer.write(json.dumps(emit_message).encode())
                 await client_writer.drain()
 
-    async def handle_video(self, data, addr):
+    async def handle_video(self, data):
         for client_addr in self.clients_addr['video'].values():
             self.transport['video'].sendto(data, client_addr)
             #print(f"Sending video data to {client_addr}")
@@ -138,12 +138,9 @@ class ConferenceServer:
         # Cancel all tasks
         tasks = [task for task in asyncio.all_tasks(self.loop) if task is not asyncio.current_task()]
         success = np.array([task.cancel() for task in tasks])
-        for client_addr in self.clients_addr['video'].values():
-            self.transport['video'].sendto(b'Cancelled', client_addr)
         await asyncio.gather(*tasks, return_exceptions=True)
         if success.all():
             print(f"Conference {self.conference_id} successfully cancelled.")
-            self.main_server.conference_servers.pop(self.conference_id)
         else:
             print(f"Failed to cancel conference {self.conference_id}.")
 
