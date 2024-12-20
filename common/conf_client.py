@@ -1,6 +1,5 @@
 import json
 import threading
-import time
 
 from PyQt5.QtCore import pyqtSignal
 
@@ -14,7 +13,7 @@ from util import *
 
 
 class ConferenceClient:
-    def __init__(self, app=None):
+    def __init__(self):
         # sync client
         self.userInfo: User = None
         self.recv_thread: Dict[str, threading.Thread] = {}
@@ -119,7 +118,7 @@ class ConferenceClient:
 
     def quit_conference(self):
         """
-        quit your on-going conference
+        quit your ongoing conference
         """
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
@@ -132,7 +131,7 @@ class ConferenceClient:
 
     def cancel_conference(self):
         """
-        cancel your on-going conference (when you are the conference manager): ask server to close all clients
+        cancel your ongoing conference (when you are the conference manager): ask server to close all clients
         """
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
@@ -190,20 +189,6 @@ class ConferenceClient:
         self.recv_thread['text'] = threading.Thread(target=recv_task)
         self.recv_thread['text'].start()
 
-    def keep_recv_video(self):
-        """
-        running task: keep receiving video data
-        """
-        def recv_task():
-            while self.on_meeting:
-                _recv_data = self.videoReceiver.output_image()
-                if _recv_data and self.update_signal and 'video' in self.update_signal:
-                    self.update_signal['video'].emit(_recv_data)
-                time.sleep(0.01)
-
-        self.recv_thread['video'] = threading.Thread(target=recv_task)
-        self.recv_thread['video'].start()
-
     def output_data(self):
         """
         running task: output received stream data
@@ -234,10 +219,9 @@ class ConferenceClient:
         # Establish connection with video data server
         self.conns['video'].sendall(json.dumps(init_request).encode())
         self.conns['audio'].sendall(json.dumps(init_request).encode())
-        self.videoReceiver = VideoReceiver(self.conns['video'])
+        self.videoReceiver = VideoReceiver(self.conns['video'], self.update_signal['video'])
         self.audioReceiver = AudioReceiver(self.conns['audio'], streamout)
         self.audioSender = AudioSender(self.conns['audio'], self.userInfo.uuid, streamin)
-        self.keep_recv_video()
         self.videoReceiver.start()
         self.audioReceiver.start()
         self.audioSender.start()

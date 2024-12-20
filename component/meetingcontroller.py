@@ -23,7 +23,7 @@ class MeetingController(QObject):
         self.displayArea = self.meetingUI.displayArea
         self.isOwned = isOwned
         self.user_view = user_view # type: User
-
+        self.isSharing = False
         # connect signal
         self.meetingUI.close_signal.connect(self.closed)
         self.meetingUI.commandBar.getCommandBar().share_signal.connect(self.handle_video_send)
@@ -47,7 +47,12 @@ class MeetingController(QObject):
         try:
             if str == 'stop':
                 self.app.send_video_stop()
+                self.isSharing = False
             else:
+                if self.isSharing:
+                    self.app.send_video_switch_mode()
+                    return
+                self.isSharing = True
                 self.app.send_video_start(str)
                 print("video send", str)
         except Exception as e:
@@ -70,6 +75,7 @@ class MeetingController(QObject):
     def handle_quit(self):
         self.app.send_video_stop()
         self.meetingUI.close()
+        self.app.mainui.show()
 
     def handle_cancel(self):
         self.app.send_video_stop()
