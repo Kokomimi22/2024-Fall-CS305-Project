@@ -1,6 +1,5 @@
 import asyncio
-from asyncio import AbstractEventLoop
-from codecs import StreamWriter, StreamReader
+from asyncio import StreamWriter, StreamReader, AbstractEventLoop
 
 from Protocol.AudioProtocol import AudioProtocol
 from Protocol.VideoProtocol import VideoProtocol
@@ -9,7 +8,7 @@ from common.user import *
 
 class ConferenceServer:
     def __init__(self, manager_id: str, conference_id: int, conf_serve_port: int, conference_name: str):
-        self.transport: Dict[str, asyncio.DatagramTransport] = {} # self.transport[datatype] = transport
+        self.transport: Dict[str, asyncio.DatagramTransport] = {}  # self.transport[datatype] = transport
         # the uuid of the manager of the conference
         self.manager_id: str = manager_id  # str(uuid)
         self.conference_id: int = conference_id
@@ -19,15 +18,16 @@ class ConferenceServer:
         self.data_types: List[str] = ['video', 'audio', 'text']
         self.mixed_audio_buffer = {}
         self.clients_info = []
-        self.client_conns_text = {} # self.client_conns_text[addr] = (reader, writer), This is for text data like quit, init, and text message
+        self.client_conns_text = {}  # self.client_conns_text[client_id] = (reader, writer), This is for text data like quit, init, and text message
         """
         self.clients_addr[datatype][client_id] = addr
         ,it is used to store the address of the client when transmitting screen, camera, and audio data
         """
         self.clients_addr = {datatype: {} for datatype in self.data_types}
-        self.mode: str = DataTransferMode.CS.value
+        self.mode: str = DistributeProtocol.CLIENT_SERVER.value
         self.running: bool = True
         self.loop: AbstractEventLoop = asyncio.new_event_loop()
+        self.p2p_ports = {} # self.p2p_ports[client_id] = port, it is used to store the port of the client in peer-to-peer mode
 
     def get_info(self):
         return {
@@ -43,8 +43,6 @@ class ConferenceServer:
         """
         addr = writer.get_extra_info('peername')
         self.clients_info.append(addr)
-        self.client_conns_text[addr] = (reader, writer)
-        self.clients_addr['text'] = addr
         client_id = None
         try:
             while self.running:
@@ -58,9 +56,27 @@ class ConferenceServer:
                     break
                 elif request['type'] == MessageType.INIT.value:
                     client_id = request['client_id']
+                    self.client_conns_text[client_id] = (reader, writer)
+                    self.clients_addr['text'][client_id] = addr
+                    await self.switch_mode()
                 elif request['type'] == MessageType.TEXT_MESSAGE.value:
                     sender_name = request.get('sender_name', 'undefined')
                     await self.emit_message(request['message'], sender_name, writer)
+                elif request['type'] == MessageType.P2P_INFOS_NOTIFICATION.value:
+                    self.p2p_ports[client_id] = request['p2p_info']
+                    # notify another client his peer's info
+                    message = {
+                        'type': MessageType.P2P_INFOS_NOTIFICATION.value,
+                        'peer_addr': {
+                            'text': (addr[0], self.p2p_ports[client_id]),
+                            'video': self.clients_addr['video'][client_id],
+                            'audio': self.clients_addr['audio'][client_id]
+                        }
+                    }
+                    for _, self_writer in self.client_conns_text.values():
+                        if self_writer != writer:
+                            self_writer.write(json.dumps(message).encode())
+                            await self_writer.drain()
                 else:
                     print(f"Unknown message: {message}")
         except asyncio.CancelledError:
@@ -68,7 +84,8 @@ class ConferenceServer:
         except ConnectionResetError:
             print(f"Connection reset by peer {addr}")
         finally:
-            del self.client_conns_text[addr]
+            self.client_conns_text.pop(client_id, None)
+            self.clients_addr['text'].pop(client_id, None)
             self.clients_info.remove(addr)
             # judge if the writer is closed
             if not writer.is_closing():
@@ -85,6 +102,35 @@ class ConferenceServer:
                 print(f"Client {addr} has left the conference.")
             if self.running and client_id == self.manager_id:
                 await self.stop()
+            if client_id != self.manager_id:
+                await self.switch_mode()
+
+    async def switch_mode(self):
+        """
+        Switch the mode of the conference.
+        :return:
+        """
+        num_clients = len(self.clients_info)
+        # If there are only two clients in the conference, switch to peer-to-peer mode
+        if num_clients == 2:
+            # waiting for the another client to join the conference or leave the conference
+            while set(map(len, self.clients_addr.values())) != {2}:
+                await asyncio.sleep(1)
+            self.mode = DistributeProtocol.PEER_TO_PEER.value
+            # Notify all clients to switch to peer-to-peer mode
+            for reader, writer in self.client_conns_text.values():
+                writer.write(json.dumps({'type': MessageType.SWITCH_TO_P2P.value}).encode())
+                await writer.drain()
+        # If there are more than two clients in the conference, switch to client-server mode
+        elif num_clients > 2:
+            # If the mode is already client-server, it does not need to switch
+            if self.mode == DistributeProtocol.CLIENT_SERVER.value:
+                return
+            self.mode = DistributeProtocol.CLIENT_SERVER.value
+            message = {'type': MessageType.SWITCH_TO_CS.value}
+            for reader, writer in self.client_conns_text.values():
+                writer.write(json.dumps(message).encode())
+                await writer.drain()
 
     async def emit_message(self, message: str, sender_name: str, sender: StreamWriter):
         """
@@ -101,16 +147,28 @@ class ConferenceServer:
                 await client_writer.drain()
 
     async def handle_video(self, data):
+        """
+        Handle video data from clients.
+        :param data: bytes
+        :return:
+        """
         for client_addr in self.clients_addr['video'].values():
             self.transport['video'].sendto(data, client_addr)
-            #print(f"Sending video data to {client_addr}")
+            # print(f"Sending video data to {client_addr}")
 
     async def handle_audio(self, data, addr):
+        """
+        Handle audio data from clients.
+        :param data: bytes
+        :param addr: tuple[ip, port]
+        :return:
+        """
         for client_addr in self.clients_addr['audio'].values():
             # if client_addr == addr:
             #     continue
             data = data.ljust(CHUNK * 2, b'\x00')
-            mixed_audio = np.add(self.mixed_audio_buffer[client_addr], np.frombuffer(data, dtype=np.int16), casting="unsafe")
+            mixed_audio = np.add(self.mixed_audio_buffer[client_addr], np.frombuffer(data, dtype=np.int16),
+                                 casting="unsafe")
             mixed_audio = np.clip(mixed_audio, -32768, 32767)
             self.mixed_audio_buffer[client_addr] = mixed_audio
         self.transport['audio'].sendto(self.mixed_audio_buffer[addr].tobytes(), addr)
@@ -128,7 +186,6 @@ class ConferenceServer:
         self.running = False
         await self.cancel_conference()
         self.loop.stop()
-
 
     async def cancel_conference(self):
         """
@@ -175,4 +232,3 @@ class ConferenceServer:
                     self.running = False
                     self.loop.run_until_complete(self.cancel_conference())
                 self.loop.close()
-

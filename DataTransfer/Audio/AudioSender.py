@@ -10,15 +10,18 @@ class AudioSender:
         self.sending = False
         self._running = False
         self._thread = None
+        self.sock_lock = threading.Lock()
 
     def _send_data(self):
         while self._running:
             if self.sending:
                 data = self.stream.read(CHUNK)
-                self.server_socket.send(data)
+                with self.sock_lock:
+                    self.server_socket.send(data)
             else:
                 data = b'\x00' * CHUNK * 2
-                self.server_socket.send(data)
+                with self.sock_lock:
+                    self.server_socket.send(data)
                 time.sleep(1 / RATE * CHUNK)
 
     def start(self):
@@ -28,8 +31,9 @@ class AudioSender:
         self._thread = threading.Thread(target=self._send_data)
         self._thread.start()
 
-    def switch_socket(self, socket_connection):
-        self.server_socket = socket_connection
+    def reconnect(self, address):
+        with self.sock_lock:
+            self.server_socket.connect(address)
 
     def terminate(self):
         try:

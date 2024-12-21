@@ -36,7 +36,7 @@ class MainServer:
             conference_id = random.randint(1000, 9999)
 
         # 会议服务器的端口号
-        conference_port = get_port()
+        conference_port = get_available_port()
         conference_server = ConferenceServer(
             client_id,
             conference_id,
@@ -44,7 +44,7 @@ class MainServer:
             conference_name)
         # 为会议服务器的每个数据服务器生成端口号
         for dataType in conference_server.data_types:
-            conference_server.data_serve_ports[dataType] = get_port()
+            conference_server.data_serve_ports[dataType] = get_available_port()
         self.conference_servers[conference_id] = conference_server
         # 启动会议服务器
         conference_thread = threading.Thread(target=conference_server.start)

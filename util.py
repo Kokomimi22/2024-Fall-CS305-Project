@@ -50,15 +50,6 @@ else:
 
 my_screen_size = pyautogui.size()
 
-
-def get_port() -> int:
-    sock = socket.socket()
-    sock.bind(('', 0))
-    port = sock.getsockname()[1]
-    sock.close()
-    return port
-
-
 def resize_image_to_fit_screen(image, my_screen_size):
     screen_width, screen_height = my_screen_size
 

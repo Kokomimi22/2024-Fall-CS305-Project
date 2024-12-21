@@ -41,14 +41,14 @@ class MessageType(Enum):
     REGISTER = 'register'
     INIT = 'init_conference'
     TEXT_MESSAGE = 'text_message'
-    PROTOCOL_UPGRADE = 'protocol_upgrade'
-
+    SWITCH_TO_P2P = 'switch_to_p2p'
+    SWITCH_TO_CS = 'switch_to_cs'
+    P2P_INFOS_NOTIFICATION = 'p2p_infos_notification'
 
 class Status(Enum):
     SUCCESS = True
     FAILED = False
 
-
-class DataTransferMode(Enum):
-    P2P = 'Peer-to-Peer'
-    CS = 'Client-Server'
+class DistributeProtocol(Enum):
+    PEER_TO_PEER = 'peer_to_peer'
+    CLIENT_SERVER = 'client_server'

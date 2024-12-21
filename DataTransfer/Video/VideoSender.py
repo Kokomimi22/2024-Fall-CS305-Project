@@ -17,6 +17,7 @@ class VideoSender:
         self.sock = socket_connection
         self._running = False
         self._thread = None
+        self.sock_lock = threading.Lock()
         # 初始化编码器
         self.codec_context = self._create_codec_context()
 
@@ -46,8 +47,15 @@ class VideoSender:
         }
         return stream
 
+    def _pack_data(self, *args):
+        data_len, sequence_number, data = args
+        return (struct.pack("I", len(self.client_id)) +
+                self.client_id +
+                struct.pack("Q", data_len) +
+                struct.pack("I", sequence_number) +
+                data)
+
     def _process_data(self):
-        client_id_len = len(self.client_id)
         while self._running:
             start_time = time.time()
             ret, frame = self.camera.get_frame()
@@ -73,12 +81,9 @@ class VideoSender:
 
                     for i in range(num_chunks):
                         chunk = encoded_data[i * VIDEO_CHUNK_SIZE: (i + 1) * VIDEO_CHUNK_SIZE]
-                        packet = (struct.pack("I", client_id_len) +
-                                  self.client_id +
-                                  struct.pack("Q", data_len) +
-                                  struct.pack("I", sequence_number) +
-                                  chunk)
-                        self.sock.send(packet)
+                        packet = self._pack_data(data_len, sequence_number, chunk)
+                        with self.sock_lock:
+                            self.sock.send(packet)
                         sequence_number += 1
 
             except Exception as e:
@@ -111,39 +116,40 @@ class VideoSender:
         if self.camera:
             self.camera.stop()
 
+    def reconnect(self, address: Tuple[str, int]):
+        with self.sock_lock:
+            self.sock.connect(address)
+
     def switch_mode(self):
+        """
+        切换摄像头模式(摄像头/屏幕共享)
+        :return:
+        """
         self.camera.switch_mode()
 
     def terminate(self):
         """
-        终止视频发送, quitConf为False时就是关闭视频发送，为True时是直接退出会议
-        :param quitConf: bool
-        :return:
+        退出会议时调用
         """
         if self._running:
             self.stop_running()
-        terminate_signal = (struct.pack("I", len(self.client_id)) +
-                            self.client_id +
-                            struct.pack("Q", 0) +
-                            struct.pack("I", 0) +
-                            b'TERMINATE')
+        terminate_signal = self._pack_data(0, 0, b'TERMINATE')
         try:
             self.sock.send(terminate_signal)
         except OSError:
             pass
 
     def stop_video_send(self):
+        """
+        停止视频发送时调用（此时并未退出会议），退出会议时请调用terminate方法
+        """
         if not self._running:
             return None
         self.stop_running()
         self.camera = None
         self._thread = None
         self.codec_context = self._create_codec_context()
-        stop_signal = (struct.pack("I", len(self.client_id)) +
-                            self.client_id +
-                            struct.pack("Q", 0) +
-                            struct.pack("I", 0) +
-                            b'END')
+        stop_signal = self._pack_data(0, 0, b'END')
         try:
             self.sock.send(stop_signal)
         except OSError:

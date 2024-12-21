@@ -1,5 +1,7 @@
 import json
 import threading
+import time
+import traceback
 
 from PyQt5.QtCore import pyqtSignal
 
@@ -22,9 +24,9 @@ class ConferenceClient:
         self.conf_server_addr = None  # conference server addr
         self.data_server_addr: Dict[str, Any] = None  # data server in the conference server
         self.on_meeting = False  # status
-        self.conns: Dict[str, socket.socket] = {}  # you may need to maintain multiple conns for a single conference
-        self.support_data_types = ['video', 'audio',
-                                   'text']  # the data types that can be shared, which should be modified
+        self.conns: Dict[str, socket.socket] = {}  # connections for different data types and **p2p**
+        self.support_data_types = \
+            ['video', 'audio', 'text']  # the data types that can be shared, which should be modified
         self.share_data = {}
         self.sharing_task = None
         self.conference_info = None  # you may need to save and update some conference_info regularly
@@ -35,6 +37,9 @@ class ConferenceClient:
         self.audioSender: AudioSender = None
         self.audioReceiver: AudioReceiver = None
         self.update_signal = {dataType: None for dataType in self.support_data_types}  # signal for updating GUI
+        self.is_p2p = False  # whether the client is in P2P mode
+        self.p2p_addr = {}  # for p2p connection bind
+        self.switch_distribution_mode_lock = threading.Lock()
 
     def user(self):
         return self.userInfo
@@ -164,70 +169,190 @@ class ConferenceClient:
             'sender_name': self.userInfo.username,
             'message': message
         }
-        self.conns['text'].sendall(json.dumps(message_post).encode())
+        connection = self.conns['p2p'] if self.is_p2p else self.conns['text']
+        connection.sendall(json.dumps(message_post).encode())
 
-    def keep_recv_text(self, recv_conn: socket.socket = None):
-        """
-        running task: keep receiving certain type of data (save or output)
-        you can create other functions for receiving various kinds of data
-        """
+    def recv_conference_task(self):
+        """处理普通会议消息的接收任务"""
+        while self.on_meeting:
+            _recv_data = self.conns['text'].recv(DATA_LINE_BUFFER)
+            # 检查是否退出会议
+            if not _recv_data or _recv_data == b'Quitted' or _recv_data == b'Cancelled':
+                print(f'You have been quitted from the conference {self.conference_id}')
+                self.close_conference()
+                break
 
-        def recv_task():
-            while self.on_meeting:
-                _recv_data = recv_conn.recv(DATA_LINE_BUFFER)
-                if _recv_data == b'Quitted' or _recv_data == b'Cancelled':
-                    print(f'You have been quitted from the conference {self.conference_id}')
-                    self.close_conference()
-                    break
-                if _recv_data:
-                    try:
-                        message = json.loads(_recv_data.decode())
-                        if message['type'] == MessageType.TEXT_MESSAGE.value and self.update_signal.get('text'):
-                            self.update_signal['text'].emit(message['sender_name'], message['message'])
-                            print(f'{message["sender_name"]}: {message["message"]}')
-                    except UnicodeDecodeError:
-                        print(f'[Info]: Received data: {len(_recv_data)} bytes')
+            # 解析和处理消息
+            try:
+                message = json.loads(_recv_data.decode())
 
-        self.recv_thread['text'] = threading.Thread(target=recv_task)
-        self.recv_thread['text'].start()
+                if message['type'] == MessageType.TEXT_MESSAGE.value and self.update_signal.get('text'):
+                    self.update_signal['text'].emit(message['sender_name'], message['message'])
+                    print(f'{message["sender_name"]}: {message["message"]}')
+
+                elif message['type'] == MessageType.SWITCH_TO_P2P.value:
+                    self.conns['p2p'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    self.conns['p2p'].bind(('0.0.0.0', 0))
+                    self.conns['text'].sendall(
+                        json.dumps({
+                            'type': MessageType.P2P_INFOS_NOTIFICATION.value,
+                            'client_id': self.userInfo.uuid,
+                            'p2p_info': self.conns['p2p'].getsockname()[1]
+                        }).encode())
+
+                elif message['type'] == MessageType.P2P_INFOS_NOTIFICATION.value:
+                    self.p2p_addr = {key: tuple(value) for key, value in message['peer_addr'].items()}
+                    self._switch_to_p2p()
+                    print(f'[Info]: Switch to P2P mode')
+
+                elif message['type'] == MessageType.SWITCH_TO_CS.value:
+                    self._switch_to_cs()
+                    self.p2p_addr = {}
+                    if 'p2p' in self.conns:
+                        try:
+                            self.conns['p2p'].shutdown(socket.SHUT_RDWR)
+                            self.conns['p2p'].close()
+                        except socket.error as e:
+                            print(f"[Error]: Error closing connection: {e}")
+                    self.conns.pop('p2p', None)
+                    print(f'[Info]: Switch to CS mode')
+
+                else:
+                    print(f'[Error]: Received unknown data: {message}')
+
+            except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
+                traceback.print_exc()
+                print(f'[Info]: Received Unknown data: {len(_recv_data)} bytes')
+
+    def recv_p2p_task(self):
+        """处理P2P消息的接收任务"""
+        # 设置为非阻塞模式, 避免卡死
+        self.conns['p2p'].setblocking(False)
+        while self.on_meeting and self.is_p2p:
+            try:
+                _recv_data = self.conns['p2p'].recv(DATA_LINE_BUFFER)
+            except BlockingIOError:
+                continue
+            if not _recv_data:
+                break
+            # 解析和处理消息
+            try:
+                message = json.loads(_recv_data.decode())
+
+                if message['type'] == MessageType.TEXT_MESSAGE.value and self.update_signal.get('text'):
+                    self.update_signal['text'].emit(message['sender_name'], message['message'])
+                    print(f'{message["sender_name"]}: {message["message"]}')
+
+                else:
+                    print(f'[Error]: Received unknown data: {message}')
+
+            except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
+                traceback.print_exc()
+                print(f'[Info]: Received Unknown data: {len(_recv_data)} bytes')
 
     def output_data(self):
         """
         running task: output received stream data
         """
-        # write is into a file
         print(f'[Info]: Received data: {self.recv_data}')
+
+    def reconnect(self, addr_dict: Dict[str, Tuple[str, int]]):
+        """
+        reconnect to the server or other clients
+        """
+        print(f'[Info]: Reconnecting to {"server" if not self.is_p2p else "peer"} {addr_dict}')
+        if self.is_p2p:
+            while True:
+                try:
+                    self.conns['p2p'].connect(addr_dict['text'])
+                    break
+                except ConnectionRefusedError:
+                    print(f'[Info]: Waiting for the peer to connect')
+                    time.sleep(1)
+            self.recv_thread['p2p_text'] = threading.Thread(target=self.recv_p2p_task)
+            self.recv_thread['p2p_text'].start()
+        elif 'p2p_text' in self.recv_thread:
+            self.recv_thread['p2p_text'].join()
+            self.recv_thread.pop('p2p_text', None)
+        if self.videoSender:
+            self.videoSender.reconnect(addr_dict['video'])
+        if self.audioSender:
+            self.audioSender.reconnect(addr_dict['audio'])
+
+    def _switch_to_p2p(self):
+        """
+        Switch to p2p mode
+        """
+        with self.switch_distribution_mode_lock:
+            self.is_p2p = True
+            self.reconnect(self.p2p_addr)
+
+    def _switch_to_cs(self):
+        """
+        Switch to client-server mode
+        """
+        with self.switch_distribution_mode_lock:
+            self.is_p2p = False
+            self.reconnect(self.data_server_addr)
+
+    def _init_connections(self, addr_dict: Dict[str, Tuple[str, int]]):
+        """
+        Initialize connections for conference mode
+        :param addr_dict: dict of addresses for different data types
+        """
+        connections = self.conns
+        # Initialize sockets
+        for medium in ['text', 'video', 'audio']:
+            sock_type = socket.SOCK_STREAM if medium == 'text' else socket.SOCK_DGRAM
+            connections[medium] = socket.socket(socket.AF_INET, sock_type)
+            connections[medium].connect(addr_dict[medium])
+
+    def start_sender_and_receiver(self):
+        """
+        Start video and audio senders and receivers.
+        and bind the connections to the server or other clients.
+        :return:
+        """
+        connections = self.conns
+        # Initialize text connection
+        self.recv_thread['text'] = threading.Thread(target=self.recv_conference_task)
+        # Set the thread as daemon so that it will be terminated when the main thread exits
+        self.recv_thread['text'].daemon = True
+        self.recv_thread['text'].start()
+
+        # Initialize video connection
+        self.videoReceiver = VideoReceiver(connections['video'], self.update_signal['video'])
+        self.videoSender = VideoSender(None, connections['video'], self.userInfo.uuid)
+        self.videoReceiver.start()
+
+        # Initialize audio connection
+        self.audioReceiver = AudioReceiver(connections['audio'], streamout)
+        self.audioSender = AudioSender(connections['audio'], self.userInfo.uuid, streamin)
+        self.audioReceiver.start()
+        self.audioSender.start()
 
     def start_conference(self):
         """
-        init conns when create or join a conference with necessary conference_info
-        and
-        start necessary running task for conference
+        Initialize connections and start conference
         """
-        self.conns['text'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.conns['video'] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.conns['audio'] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.conns['text'].connect(self.conf_server_addr)
-        self.conns['video'].connect(self.data_server_addr['video'])
-        self.conns['audio'].connect(self.data_server_addr['audio'])
-        init_request = {
-            'type': MessageType.INIT.value,
-            'client_id': self.userInfo.uuid
-        }
-        # Establish connection with text data server
-        self.conns['text'].sendall(json.dumps(init_request).encode())
-        # start receiving text data
-        self.keep_recv_text(self.conns['text'])
-        # Establish connection with video data server
-        self.conns['video'].sendall(json.dumps(init_request).encode())
-        self.conns['audio'].sendall(json.dumps(init_request).encode())
-        self.videoSender = VideoSender(None, self.conns['video'], self.userInfo.uuid)
-        self.videoReceiver = VideoReceiver(self.conns['video'], self.update_signal['video'])
-        self.audioReceiver = AudioReceiver(self.conns['audio'], streamout)
-        self.audioSender = AudioSender(self.conns['audio'], self.userInfo.uuid, streamin)
-        self.videoReceiver.start()
-        self.audioReceiver.start()
-        self.audioSender.start()
+        with self.switch_distribution_mode_lock:
+            addr_dict = {
+                'text': self.conf_server_addr,
+                'video': self.data_server_addr['video'],
+                'audio': self.data_server_addr['audio']
+            }
+
+            self._init_connections(addr_dict)
+            # Send init request to servers
+            init_request = {
+                'type': MessageType.INIT.value,
+                'client_id': self.userInfo.uuid
+            }
+
+            for medium in ['text', 'video', 'audio']:
+                self.conns[medium].sendall(json.dumps(init_request).encode())
+
+            self.start_sender_and_receiver()
 
     def close_conference(self):
         """
@@ -243,7 +368,7 @@ class ConferenceClient:
                     if instance:
                         instance.terminate()
                         setattr(self, attr, None)
-
+                self.is_p2p = False
                 # Join send and receive threads if they are not the current thread
                 for thread_dict in [self.send_thread, self.recv_thread]:
                     for thread in thread_dict.values():
