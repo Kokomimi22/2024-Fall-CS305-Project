@@ -28,6 +28,9 @@ class AudioSender:
         self._thread = threading.Thread(target=self._send_data)
         self._thread.start()
 
+    def switch_socket(self, socket_connection):
+        self.server_socket = socket_connection
+
     def terminate(self):
         try:
             self.server_socket.send(b'END')

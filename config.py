@@ -41,6 +41,7 @@ class MessageType(Enum):
     REGISTER = 'register'
     INIT = 'init_conference'
     TEXT_MESSAGE = 'text_message'
+    PROTOCOL_UPGRADE = 'protocol_upgrade'
 
 
 class Status(Enum):

@@ -11,6 +11,7 @@ import cv2
 import pyautogui
 import numpy as np
 from PIL import Image, ImageGrab
+from PyQt5.QtGui import QGuiApplication, QImage
 from PyQt5.QtMultimedia import QCameraInfo, QAudioDeviceInfo, QAudio, QCamera, QCameraImageCapture, QAudioInput, \
     QAudioFormat
 from deprecated.sphinx import deprecated
@@ -109,6 +110,12 @@ def overlay_camera_images(camera_images: List[np.array], grid_size=(2, 2)):
         grid_image[y:y + cell_height, x:x + cell_width] = camera_image
 
     return grid_image
+
+def qcapture_screen():
+    screen = QGuiApplication.primaryScreen()
+    if screen:
+        return screen.grabWindow(0).toImage()
+
 
 def capture_screen():
     try:
@@ -217,6 +224,24 @@ def audio_data_to_volume(data):
     volume = volume if volume < 100 else 100.0
     int16_max_value = np.iinfo(np.int16).max
     return int(volume)
+
+def get_localhost_ip():
+    """
+    get localhost ip
+    :return: str, localhost ip
+    """
+    return socket.gethostbyname(socket.gethostname())
+
+def get_available_port():
+    """
+    get available port
+    :return: int, available port
+    """
+    sock = socket.socket()
+    sock.bind(('', 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    return port
         
 
 ### UUID module ###
