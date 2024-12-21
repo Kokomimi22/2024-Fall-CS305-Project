@@ -84,7 +84,7 @@ class AppController(QObject):
     closed = pyqtSignal()
     message_received = pyqtSignal(str, str)  # sender_name, message
     video_received = pyqtSignal(Image)  # video
-    audio_received = pyqtSignal(bytes)  # audio
+    control_received = pyqtSignal(MessageType, str)  # for control message
 
     def __init__(self, mainui: Main, loginui: LoginWindow):
         super().__init__()
@@ -117,16 +117,14 @@ class AppController(QObject):
         conf_client.switch_video_mode()
 
     def send_audio_start(self):
-        # TODO: start AudioSender
-        pass
+        conf_client.start_send_audio()
 
     def change_audio_volume(self, volume):
-        # TODO: change AudioSender volume
+        # TODO
         pass
 
     def send_audio_stop(self):
-        # TODO: stop AudioSender
-        pass
+        conf_client.stop_send_audio()
 
     def cancel_conference(self):
         conf_client.cancel_conference()
@@ -292,10 +290,10 @@ class HomeController:
     def _init_signal_connection(self):
         if self.meetingController:
             self.meetingController.closed.connect(self.handle_quit)
-            # TODO: connect signal
             self.app.message_received.connect(self.meetingController.message_received)
             self.app.video_received.connect(self.meetingController.video_received)
-            self.app.audio_received.connect(self.meetingController.audio_received)
+            self.app.control_received.connect(self.meetingController.control_received)
+            self.app.control_received.connect(self.handle_meeting_close)
 
     def handle_meeting_join(self, meeting_id, meeting_name):
         try:
@@ -313,6 +311,14 @@ class HomeController:
         except Exception as e:
             print(e)
             self.interface.info('error', 'Error', 'Failed to join meeting')
+
+    def handle_meeting_close(self, message_type: MessageType, _):
+        if message_type == MessageType.QUIT:
+            self.app.mainui.show()
+            if self.meetingInterface:
+                self.meetingInterface.deleteLater()
+            self.meetingInterface = None
+            self.meetingController = None
 
     def handle_quit(self):
         try:

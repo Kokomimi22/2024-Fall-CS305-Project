@@ -7,10 +7,11 @@ from common.user import *
 
 
 class ConferenceServer:
-    def __init__(self, manager_id: str, conference_id: int, conf_serve_port: int, conference_name: str):
+    def __init__(self, manager_id: str, manage_name: str, conference_id: int, conf_serve_port: int, conference_name: str):
         self.transport: Dict[str, asyncio.DatagramTransport] = {}  # self.transport[datatype] = transport
         # the uuid of the manager of the conference
         self.manager_id: str = manager_id  # str(uuid)
+        self.manager_name: str = manage_name # str(username)
         self.conference_id: int = conference_id
         self.conference_name: str = conference_name
         self.conf_serve_port: int = conf_serve_port
@@ -33,7 +34,7 @@ class ConferenceServer:
         return {
             'conference_name': self.conference_name,
             'conference_id': self.conference_id,
-            'manager_id': self.manager_id,
+            'manager_id': self.manager_name,
             'mode': self.mode
         }
 

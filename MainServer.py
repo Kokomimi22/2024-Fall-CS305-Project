@@ -37,8 +37,10 @@ class MainServer:
 
         # 会议服务器的端口号
         conference_port = get_available_port()
+        client_name = self.user_manager.get_user(client_id).username
         conference_server = ConferenceServer(
             client_id,
+            client_name,
             conference_id,
             conference_port,
             conference_name)
