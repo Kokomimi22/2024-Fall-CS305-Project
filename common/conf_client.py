@@ -24,6 +24,7 @@ class ConferenceClient:
         self.conf_server_addr = None  # conference server addr
         self.data_server_addr: Dict[str, Any] = None  # data server in the conference server
         self.on_meeting = False  # status
+        self.isManager = False  # whether the client is the manager of the conference
         self.conns: Dict[str, socket.socket] = {}  # connections for different data types and **p2p**
         self.support_data_types = \
             ['video', 'audio', 'text']  # the data types that can be shared, which should be modified
@@ -88,6 +89,7 @@ class ConferenceClient:
             if recv_data['status'] == Status.SUCCESS.value:
                 # 成功了就加入会议
                 self.join_conference(recv_data['conference_id'])
+                self.isManager = True
                 print(f'[Info]: Created conference {self.conference_id} successfully')
             else:
                 print(f'[Error]: {recv_data["message"]}')
@@ -129,6 +131,8 @@ class ConferenceClient:
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
             return f'[Error]: You are not in a conference'
+        if self.isManager:
+            return self.cancel_conference()
         quit_request = {
             'type': MessageType.QUIT.value,
             'client_id': self.userInfo.uuid,
@@ -142,6 +146,9 @@ class ConferenceClient:
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
             return f'[Error]: You are not in a conference'
+        if not self.isManager:
+            print(f'[Error]: You are not the manager of this conference')
+            return f'[Error]: You are not the manager of this conference'
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
             cancel_request = {
@@ -152,6 +159,7 @@ class ConferenceClient:
             s.sendall(json.dumps(cancel_request).encode())
             recv_data = json.loads(s.recv(CONTROL_LINE_BUFFER).decode('utf-8'))
             if recv_data['status'] == Status.SUCCESS.value:
+                self.isManager = False
                 self.on_meeting = False
             else:
                 print(f'[Error]: {recv_data["message"]}')
@@ -178,6 +186,8 @@ class ConferenceClient:
             _recv_data = self.conns['text'].recv(DATA_LINE_BUFFER)
             # 检查是否退出会议
             if not _recv_data or _recv_data == b'Quitted' or _recv_data == b'Cancelled':
+                if self.update_signal.get('control'):
+                    self.update_signal['control'].emit(MessageType.QUIT, '')
                 print(f'You have been quitted from the conference {self.conference_id}')
                 self.close_conference()
                 break
@@ -415,7 +425,7 @@ class ConferenceClient:
         """
         stop video sender for sharing camera data
         """
-        if self.videoSender.isRunning():
+        if self.videoSender and self.videoSender.isRunning():
             self.videoSender.stop_video_send()
         else:
             print(f'[Error]: Video sender is not started')
@@ -429,6 +439,7 @@ class ConferenceClient:
             return
         if self.audioSender:
             self.audioSender.sending = True
+            print(f'[Info]: Start sending audio')
 
     def stop_send_audio(self):
         """
@@ -439,6 +450,7 @@ class ConferenceClient:
             return
         if self.audioSender:
             self.audioSender.sending = False
+            print(f'[Info]: Stop sending audio')
 
     def register(self, username, password):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -491,5 +503,5 @@ class ConferenceClient:
         self.update_signal = {
             'text': app.message_received,  # type: pyqtSignal(str, str)
             'video': app.video_received,  # type: pyqtSignal(Image)
-            'audio': app.audio_received  # type: pyqtSignal(bytes)
+            'control': app.control_received  # type: pyqtSignal(MessageType, str)
         }  # {data_type: handler} for GUI update

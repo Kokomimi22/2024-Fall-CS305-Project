@@ -9,5 +9,6 @@
     <file>avatar/avatar_0.png</file>
     <file>avatar/avatar_1.png</file>
     <file>avatar/avatar_2.png</file>
+    <file>icon/mute.png</file>
   </qresource>
 </RCC>

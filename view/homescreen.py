@@ -358,7 +358,8 @@ class HomeInterface(QFrame):
         card = ConferenceCard(title, creator, id, self)
         card.joinButton.clicked.connect(card.showMessageBox)
         card_w = card.width()
-        if self.srollWidth > (card_w + 10) * self.scrollLayout.count():
+        print(self.scrollLayout.count())
+        if self.srollWidth < (card_w + 10) * (self.scrollLayout.count() + 1):
             self.srollWidth += card_w + 10 # 10 is the spacing
         self.scrollLayout.addWidget(card, 0, Qt.AlignLeft)
         self.meetingCardView.setFixedWidth(self.srollWidth)

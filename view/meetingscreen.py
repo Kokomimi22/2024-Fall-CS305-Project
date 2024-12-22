@@ -1,5 +1,6 @@
 import math
 import sys
+from enum import Enum
 
 from PyQt5.QtCore import Qt, QRectF, pyqtSignal, QSize
 from PyQt5.QtGui import QFont, QColor, QIcon, QImage, QPainter, QPainterPath
@@ -10,7 +11,8 @@ from qfluentwidgets import (CardWidget, HeaderCardWidget, SplitTitleBar, isDarkT
                             AvatarWidget, SingleDirectionScrollArea, TextEdit, PrimaryToolButton, TextBrowser,
                             MessageDialog, MessageBox, RoundMenu, SmoothScrollArea, BodyLabel, PrimaryPushButton,
                             TransparentToolButton, ToolButton, InfoBar, InfoBarPosition, CheckableMenu,
-                            TransparentPushButton, ToolTipFilter, MenuIndicatorType, TransparentDropDownPushButton
+                            TransparentPushButton, ToolTipFilter, MenuIndicatorType, TransparentDropDownPushButton,
+                            FluentIconBase, Theme
                             )
 from qfluentwidgets.components.widgets.card_widget import CardSeparator
 from qfluentwidgets.components.widgets.flyout import IconWidget, PullUpFlyoutAnimationManager
@@ -28,6 +30,13 @@ if isWin11():
     from qframelesswindow import AcrylicWindow as MeetingWindow
 else:
     from qframelesswindow import FramelessWindow as MeetingWindow
+
+class MeetingIcon(FluentIconBase, Enum):
+    STOP_SPEAK = "mute"
+
+    def path(self, theme=Theme.AUTO) -> str:
+        return f":/icon/{self.value}.png"
+
 
 class MeetingTitleBar(SplitTitleBar):
     def __init__(self, parent=None):
@@ -220,14 +229,14 @@ class FullCommandBar(CommandBar):
         self.share_action = TransparentDropDownPushButton(FluentIcon.SHARE, 'Share')
         self.share_action.setFixedSize(100, 30)
         self.share_action.setFont(QFont('Segoe UI', 9))
-        self.speak_action = Action(FluentIcon.MICROPHONE, 'Speak')
+        self.speak_action = Action(MeetingIcon.STOP_SPEAK, 'Speak')
 
         self.addWidget(self.share_action)
         self.addActions([
             self.speak_action,
         ])
-
-        self.addWidget(LabelledVolumeButton())
+        self.volume_action = LabelledVolumeButton(self)
+        self.addWidget(self.volume_action)
 
         self.share_menu = CheckableMenu(self, indicatorType=MenuIndicatorType.RADIO)
         self._init_share_menu()
@@ -258,6 +267,9 @@ class FullCommandBar(CommandBar):
         ])
 
         action1.setChecked(True)
+
+    def setSpeak(self, isSpeaking):
+        self.speak_action.setIcon(MeetingIcon.STOP_SPEAK if isSpeaking else FluentIcon.MICROPHONE)
 
     def share_menu_event(self, checked):
         if checked:
