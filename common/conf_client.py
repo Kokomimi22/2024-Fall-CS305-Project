@@ -1,7 +1,6 @@
 import json
 import threading
 import time
-import traceback
 
 from PyQt5.QtCore import pyqtSignal
 
@@ -216,6 +215,9 @@ class ConferenceClient:
                     print(f'[Info]: Switch to P2P mode')
 
                 elif message['type'] == MessageType.SWITCH_TO_CS.value:
+                    # 仅当当前为P2P模式时才切换
+                    if not self.is_p2p:
+                        continue
                     self._switch_to_cs()
                     self.p2p_addr = {}
                     if 'p2p' in self.conns:
@@ -231,7 +233,6 @@ class ConferenceClient:
                     print(f'[Error]: Received unknown data: {message}')
 
             except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
-                traceback.print_exc()
                 print(f'[Info]: Received Unknown data: {len(_recv_data)} bytes')
 
     def recv_p2p_task(self):
@@ -257,7 +258,6 @@ class ConferenceClient:
                     print(f'[Error]: Received unknown data: {message}')
 
             except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
-                traceback.print_exc()
                 print(f'[Info]: Received Unknown data: {len(_recv_data)} bytes')
 
     def output_data(self):
@@ -315,7 +315,8 @@ class ConferenceClient:
         for medium in ['text', 'video', 'audio']:
             sock_type = socket.SOCK_STREAM if medium == 'text' else socket.SOCK_DGRAM
             connections[medium] = socket.socket(socket.AF_INET, sock_type)
-            connections[medium].connect(addr_dict[medium])
+            if medium != 'video':
+                connections[medium].connect(addr_dict[medium])
 
     def start_sender_and_receiver(self):
         """
@@ -332,7 +333,7 @@ class ConferenceClient:
 
         # Initialize video connection
         self.videoReceiver = VideoReceiver(connections['video'], self.update_signal['video'])
-        self.videoSender = VideoSender(None, connections['video'], self.userInfo.uuid)
+        self.videoSender = VideoSender(None, connections['video'], self.userInfo.uuid, self.data_server_addr['video'])
         self.videoReceiver.start()
 
         # Initialize audio connection
@@ -360,6 +361,9 @@ class ConferenceClient:
             }
 
             for medium in ['text', 'video', 'audio']:
+                if medium == 'video':
+                    self.conns[medium].sendto(json.dumps(init_request).encode(), addr_dict[medium])
+                    continue
                 self.conns[medium].sendall(json.dumps(init_request).encode())
 
             self.start_sender_and_receiver()
@@ -400,6 +404,9 @@ class ConferenceClient:
         """
         switch video mode between camera and screen
         """
+        if not self.on_meeting or not self.videoSender:
+            print(f'[Error]: You are not in a conference')
+            return
         if not self.videoSender.isRunning():
             print(f'[Error]: Video sender is not started')
             return
@@ -409,7 +416,7 @@ class ConferenceClient:
         """
         start video sender for sharing camera data
         """
-        if not self.on_meeting:
+        if not self.on_meeting or not self.videoSender:
             print(f'[Error]: You are not in a conference')
             return
         if self.videoSender.isRunning():
@@ -427,6 +434,7 @@ class ConferenceClient:
         """
         if self.videoSender and self.videoSender.isRunning():
             self.videoSender.stop_video_send()
+            print(f'[Info]: Stop video sender')
         else:
             print(f'[Error]: Video sender is not started')
 

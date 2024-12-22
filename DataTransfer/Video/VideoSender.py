@@ -2,6 +2,7 @@ import io
 import struct
 import threading
 import time
+import socket
 
 import av
 import cv2
@@ -10,14 +11,17 @@ from config import *
 
 
 class VideoSender:
-    def __init__(self, camera, socket_connection, client_id=None, frame_rate=30):
+    def __init__(self, camera, socket_connection: socket.socket, client_id: str=None, target_addr: Tuple[str, int] = None, frame_rate: int=30):
         self.camera = camera
         self.client_id = client_id.encode('utf-8') if client_id else b''
         self.frame_rate = frame_rate
         self.sock = socket_connection
+        self.target_addr = target_addr
         self._running = False
         self._thread = None
         self.sock_lock = threading.Lock()
+        # 用于向自己发送数据
+        self.loopback_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # 初始化编码器
         self.codec_context = self._create_codec_context()
 
@@ -83,7 +87,8 @@ class VideoSender:
                         chunk = encoded_data[i * VIDEO_CHUNK_SIZE: (i + 1) * VIDEO_CHUNK_SIZE]
                         packet = self._pack_data(data_len, sequence_number, chunk)
                         with self.sock_lock:
-                            self.sock.send(packet)
+                            self.sock.sendto(packet, self.target_addr)
+                        self.loopback_sock.sendto(packet, ('127.0.0.1', self.sock.getsockname()[1]))
                         sequence_number += 1
 
             except Exception as e:
@@ -110,7 +115,7 @@ class VideoSender:
                 packets = self.codec_context.encode(None)
                 for packet in packets:
                     encoded_data = bytes(packet)
-                    self.sock.send(encoded_data)
+                    self.sock.sendto(self._pack_data(len(encoded_data), 0, encoded_data), self.target_addr)
             except Exception as e:
                 print(f"Error flushing encoder: {e}")
         if self.camera:
@@ -118,7 +123,7 @@ class VideoSender:
 
     def reconnect(self, address: Tuple[str, int]):
         with self.sock_lock:
-            self.sock.connect(address)
+            self.target_addr = address
 
     def switch_mode(self):
         """
@@ -135,7 +140,8 @@ class VideoSender:
             self.stop_running()
         terminate_signal = self._pack_data(0, 0, b'TERMINATE')
         try:
-            self.sock.send(terminate_signal)
+            self.sock.sendto(terminate_signal, self.target_addr)
+            self.loopback_sock.close()
         except OSError:
             pass
 
@@ -151,6 +157,7 @@ class VideoSender:
         self.codec_context = self._create_codec_context()
         stop_signal = self._pack_data(0, 0, b'END')
         try:
-            self.sock.send(stop_signal)
+            self.sock.sendto(stop_signal, self.target_addr)
+            self.loopback_sock.sendto(stop_signal, ('127.0.0.1', self.sock.getsockname()[1]))
         except OSError:
             pass

@@ -1,10 +1,11 @@
 import asyncio
 from asyncio import StreamWriter, StreamReader, AbstractEventLoop
 
+from win32trace import write
+
 from Protocol.AudioProtocol import AudioProtocol
 from Protocol.VideoProtocol import VideoProtocol
 from common.user import *
-
 
 class ConferenceServer:
     def __init__(self, manager_id: str, manage_name: str, conference_id: int, conf_serve_port: int, conference_name: str):
@@ -101,10 +102,13 @@ class ConferenceServer:
                 except asyncio.TimeoutError:
                     print(f"Waiting for {addr} to close timed out.")
                 print(f"Client {addr} has left the conference.")
-            if self.running and client_id == self.manager_id:
-                await self.stop()
-            if client_id != self.manager_id:
+            if self.mode == DistributeProtocol.PEER_TO_PEER.value:
+                self.p2p_ports.pop(client_id, None)
+                for datatype in self.data_types:
+                    self.clients_addr[datatype].pop(client_id, None)
+            if self.running and client_id != self.manager_id:
                 await self.switch_mode()
+
 
     async def switch_mode(self):
         """
@@ -112,8 +116,15 @@ class ConferenceServer:
         :return:
         """
         num_clients = len(self.clients_info)
+        # If there are no clients in the conference, switch to client-server mode
+        if num_clients == 1:
+            self.mode = DistributeProtocol.CLIENT_SERVER.value
+            writer = list(self.client_conns_text.values())[0][1]
+            message = {'type': MessageType.SWITCH_TO_CS.value}
+            writer.write(json.dumps(message).encode())
+            await writer.drain()
         # If there are only two clients in the conference, switch to peer-to-peer mode
-        if num_clients == 2:
+        elif num_clients == 2:
             # waiting for the another client to join the conference or leave the conference
             while set(map(len, self.clients_addr.values())) != {2}:
                 await asyncio.sleep(1)
@@ -147,13 +158,16 @@ class ConferenceServer:
                 client_writer.write(json.dumps(emit_message).encode())
                 await client_writer.drain()
 
-    async def handle_video(self, data):
+    async def handle_video(self, data, addr):
         """
         Handle video data from clients.
+        :param addr: tuple[ip, port]
         :param data: bytes
         :return:
         """
         for client_addr in self.clients_addr['video'].values():
+            if client_addr == addr:
+                continue
             self.transport['video'].sendto(data, client_addr)
             # print(f"Sending video data to {client_addr}")
 
@@ -165,8 +179,8 @@ class ConferenceServer:
         :return:
         """
         for client_addr in self.clients_addr['audio'].values():
-            # if client_addr == addr:
-            #     continue
+            if client_addr == addr:
+                continue
             data = data.ljust(CHUNK * 2, b'\x00')
             mixed_audio = np.add(self.mixed_audio_buffer[client_addr], np.frombuffer(data, dtype=np.int16),
                                  casting="unsafe")
@@ -203,7 +217,7 @@ class ConferenceServer:
             print(f"Failed to cancel conference {self.conference_id}.")
 
     def start(self):
-        server_coro = asyncio.start_server(self.handle_client, '127.0.0.1', self.conf_serve_port)
+        text_server_coro = asyncio.start_server(self.handle_client, '127.0.0.1', self.conf_serve_port)
         video_server_coro = self.loop.create_datagram_endpoint(
             lambda: VideoProtocol(self),
             local_addr=('127.0.0.1', self.data_serve_ports['video'])
@@ -212,7 +226,7 @@ class ConferenceServer:
             lambda: AudioProtocol(self),
             local_addr=('127.0.0.1', self.data_serve_ports['audio'])
         )
-        server = self.loop.run_until_complete(server_coro)
+        text_server = self.loop.run_until_complete(text_server_coro)
         self.transport['video'], _ = self.loop.run_until_complete(video_server_coro)
         self.transport['audio'], _ = self.loop.run_until_complete(audio_server_coro)
         self.loop.create_task(self.log())
@@ -225,10 +239,10 @@ class ConferenceServer:
             self.loop.stop()
         finally:
             if not self.loop.is_closed():
-                server.close()
+                text_server.close()
                 for transport in self.transport.values():
                     transport.close()
-                self.loop.run_until_complete(server.wait_closed())
+                self.loop.run_until_complete(text_server.wait_closed())
                 if self.running:
                     self.running = False
                     self.loop.run_until_complete(self.cancel_conference())

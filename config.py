@@ -27,7 +27,7 @@ CODE_C = 'audio/pcm'  # Codec for audio capture
 SUCCESSFUL = True
 FAILED = False
 camera_width, camera_height = 640, 480  # resolution for camera capture
-VIDEO_CHUNK_SIZE = 20000  # UDP
+VIDEO_CHUNK_SIZE = 8192  # UDP
 
 
 class MessageType(Enum):
