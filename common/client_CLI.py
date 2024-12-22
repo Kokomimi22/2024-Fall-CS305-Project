@@ -78,6 +78,8 @@ class ClientCLI:
                     self.client.stop_send_audio()
                 else:
                     print('[Error]: Invalid command' + '\r\n' + HELP)
+            elif fields[0] == 'text':
+                self.client.send_message(arg)
             else:
                 print('[Error]: Invalid command' + '\r\n' + HELP)
         elif len(fields) == 3:

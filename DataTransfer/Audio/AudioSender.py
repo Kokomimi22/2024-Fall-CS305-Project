@@ -14,7 +14,7 @@ class AudioSender:
 
     def _send_data(self):
         # 为了避免在发送数据时出现问题，先等待服务器或者P2P同伴准备好
-        time.sleep(1.0)
+        time.sleep(3.0)
         while self._running:
             if self.sending:
                 data = self.stream.read(CHUNK)

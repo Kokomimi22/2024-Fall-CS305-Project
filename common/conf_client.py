@@ -27,9 +27,6 @@ class ConferenceClient:
         self.conns: Dict[str, socket.socket] = {}  # connections for different data types and **p2p**
         self.support_data_types = \
             ['video', 'audio', 'text']  # the data types that can be shared, which should be modified
-        self.share_data = {}
-        self.sharing_task = None
-        self.conference_info = None  # you may need to save and update some conference_info regularly
         self.conference_id = None  # conference_id for distinguish difference conference
         self.recv_data = None  # you may need to save received streamd data from other clients in conference
         self.videoSender: VideoSender = None  # you may need to maintain multiple video senders for a single conference
@@ -195,8 +192,9 @@ class ConferenceClient:
             try:
                 message = json.loads(_recv_data.decode())
 
-                if message['type'] == MessageType.TEXT_MESSAGE.value and self.update_signal.get('text'):
-                    self.update_signal['text'].emit(message['sender_name'], message['message'])
+                if message['type'] == MessageType.TEXT_MESSAGE.value:
+                    if self.update_signal.get('text'):
+                        self.update_signal['text'].emit(message['sender_name'], message['message'])
                     print(f'{message["sender_name"]}: {message["message"]}')
 
                 elif message['type'] == MessageType.SWITCH_TO_P2P.value:
@@ -250,8 +248,9 @@ class ConferenceClient:
             try:
                 message = json.loads(_recv_data.decode())
 
-                if message['type'] == MessageType.TEXT_MESSAGE.value and self.update_signal.get('text'):
-                    self.update_signal['text'].emit(message['sender_name'], message['message'])
+                if message['type'] == MessageType.TEXT_MESSAGE.value:
+                    if self.update_signal.get('text'):
+                        self.update_signal['text'].emit(message['sender_name'], message['message'])
                     print(f'{message["sender_name"]}: {message["message"]}')
 
                 else:
@@ -383,6 +382,7 @@ class ConferenceClient:
                         instance.terminate()
                         setattr(self, attr, None)
                 self.is_p2p = False
+                self.isManager = False
                 # Join send and receive threads if they are not the current thread
                 for thread_dict in [self.send_thread, self.recv_thread]:
                     for thread in thread_dict.values():
@@ -398,6 +398,10 @@ class ConferenceClient:
                     for conn in self.conns.values():
                         if conn:
                             conn.close()
+                    self.conns.clear()
+                    self.p2p_addr.clear()
+                    self.send_thread.clear()
+                    self.recv_thread.clear()
                     print("[Info]: Connection closed successfully.")
                 except socket.error as e:
                     print(f"[Error]: Error closing connection: {e}")

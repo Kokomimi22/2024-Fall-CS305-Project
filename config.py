@@ -4,7 +4,9 @@ HELP = 'Create         : create an conference\n' \
        'Join [conf_id]: join a conference with conference ID\n' \
        'Quit           : quit an on-going conference\n' \
        'Cancel         : cancel your on-going conference (only the manager)\n' \
-       'On [datatype]  : turn on the data type\n\n' \
+       'On [datatype(screen, video, audio)]  : turn on the data type\n' \
+       'Off [datatype(video, audio)] : turn off the data type\n' \
+       'Text [message] : send a text message\n' \
        'Get_conferences: get the list of all conferences\n' \
        'Switch_video_mode: switch the video mode\n' \
        'Logout         : logout\n' \

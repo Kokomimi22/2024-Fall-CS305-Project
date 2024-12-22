@@ -122,6 +122,11 @@ class VideoSender:
             self.camera.stop()
 
     def reconnect(self, address: Tuple[str, int]):
+        """
+        重新连接到新的地址(服务器或者其他客户端)
+        :param address:
+        :return:
+        """
         with self.sock_lock:
             self.target_addr = address
 
