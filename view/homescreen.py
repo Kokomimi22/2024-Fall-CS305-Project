@@ -2,7 +2,8 @@ import uuid
 from multiprocessing.spawn import set_executable
 
 from qfluentwidgets import SearchLineEdit, RoundMenu, Action, TitleLabel, SubtitleLabel, ImageLabel, \
-    SingleDirectionScrollArea, FluentIcon, MessageBoxBase, LineEdit, RadioButton, BodyLabel, InfoBar, InfoBarPosition
+    SingleDirectionScrollArea, FluentIcon, MessageBoxBase, LineEdit, RadioButton, BodyLabel, InfoBar, InfoBarPosition, \
+    IconWidget
 from PyQt5.QtWidgets import QSpacerItem, QSizePolicy, QWidget, QVBoxLayout, QPushButton, QGraphicsDropShadowEffect, \
     QFrame, QHBoxLayout, QButtonGroup
 from PyQt5.QtGui import QPainter, QPainterPath, QLinearGradient, QBrush, QImage, QIcon, QColor, QDesktopServices
@@ -303,7 +304,7 @@ class HomeInterface(QFrame):
         self.mainLayout.setContentsMargins(20, 0, 20, 0)
         self.mainLayout.setSpacing(10)
 
-        self.srollWidth = 800
+        self.srollWidth = 820
 
         # create a banner widget
         self.banner = BannerWidget(self)
@@ -322,8 +323,9 @@ class HomeInterface(QFrame):
         self.searchedit = SearchLineEdit(self)
         self.searchedit.setPlaceholderText('Search meetings...')
         self.searchedit.setFixedWidth(200)
+        self.searchedit.hide()
         self.midBox.addWidget(self.searchedit, alignment=Qt.AlignCenter, stretch=2)
-        self.midBox.addSpacerItem(QSpacerItem(350, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        self.midBox.addSpacerItem(QSpacerItem(650, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)) # hide the search bar
 
         self.mainLayout.addLayout(self.midBox)
         self.body.addLayout(self.mainLayout)
@@ -432,13 +434,22 @@ class MeetingConfigMessageBox(MessageBoxBase):
 
         self.lineEdit = LineEdit(self)
         self.lineEdit.setPlaceholderText('Meeting name')
+        self.warningBadge = IconWidget(FluentIcon.INFO.colored(QColor('#ff9c1a'), QColor('#ff9c1a')), self)
+        self.warningBadge.setFixedSize(16, 16)
         self.warningLabel = BodyLabel('Meeting name cannot be empty', self)
+        self.warningLayout = QHBoxLayout()
+        self.warningLayout.addWidget(self.warningBadge)
+        self.warningLayout.addWidget(self.warningLabel)
+        self.warningLayout.setSpacing(5)
+        self.warningLayout.setContentsMargins(0, 0, 0, 0)
+        self.warningLayout.addStretch()
 
         self.viewLayout.addWidget(self.titleLabel)
         self.viewLayout.addWidget(self.hintLabel)
         self.viewLayout.addWidget(self.lineEdit)
-        self.viewLayout.addWidget(self.warningLabel)
+        self.viewLayout.addLayout(self.warningLayout)
 
+        self.warningBadge.hide()
         self.warningLabel.hide()
 
         self.widget.setMinimumWidth(350)
@@ -452,7 +463,9 @@ class MeetingConfigMessageBox(MessageBoxBase):
 
         if not valid:
             self.warningLabel.show()
+            self.warningBadge.show()
         else:
             self.warningLabel.hide()
+            self.warningBadge.hide()
 
         return valid
