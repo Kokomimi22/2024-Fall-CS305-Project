@@ -388,14 +388,16 @@ class ConferenceClient:
                     for thread in thread_dict.values():
                         if thread is not threading.current_thread():
                             thread.join()
-                for conn in self.conns.values():
-                    conn.shutdown(socket.SHUT_RDWR)
+                for datatype, conn in self.conns.items():
+                    if conn and (datatype not in ['video', 'audio']):
+                        conn.shutdown(socket.SHUT_RDWR)
             except socket.error as e:
                 print(f"[Error]: Error shutting down connection: {e}")
             finally:
                 try:
                     for conn in self.conns.values():
-                        conn.close()
+                        if conn:
+                            conn.close()
                     print("[Info]: Connection closed successfully.")
                 except socket.error as e:
                     print(f"[Error]: Error closing connection: {e}")
