@@ -49,7 +49,6 @@ class VideoReceiver:
         codec.options = {
             'threads': '4',  # 使用多线程解码
             'refcounted_frames': '1',  # 使用引用计数帧
-            'lowres': '0',  # 禁用低分辨率解码
             'flags': 'low_delay',  # 降低延迟
             'flags2': 'fast'  # 使用快速解码
         }
