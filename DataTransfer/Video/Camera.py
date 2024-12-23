@@ -1,8 +1,8 @@
 import threading
 import time
-from os import fspath
 
 from util import capture_camera, release_camera, capture_screen
+
 
 class Camera:
     def __init__(self, mode='camera', fps=30):
@@ -44,8 +44,8 @@ class Camera:
         switch between camera and screen
         """
         if self.mode == 'camera':
-           self.mode = 'screen'
-           release_camera()
+            self.mode = 'screen'
+            release_camera()
         else:
             self.mode = 'camera'
 

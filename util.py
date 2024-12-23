@@ -6,11 +6,12 @@ Note that you can use your own implementation as well :)
 import socket
 from io import BytesIO
 
+import mss
 import pyaudio
 import cv2
 import pyautogui
 import numpy as np
-from PIL import Image, ImageGrab
+from PIL import Image
 from PyQt5.QtGui import QGuiApplication, QImage
 from PyQt5.QtMultimedia import QCameraInfo, QAudioDeviceInfo, QAudio, QCamera, QCameraImageCapture, QAudioInput, \
     QAudioFormat
@@ -138,20 +139,6 @@ def qcapture_screen():
     if screen:
         return screen.grabWindow(0).toImage()
 
-
-def capture_screen():
-    try:
-        # Capture the screen using PIL's ImageGrab
-        screenshot = ImageGrab.grab()
-
-        # Convert the screenshot to a numpy array
-        frame = np.array(screenshot)
-
-        return True, frame
-    except Exception as e:
-        print(f"Failed to capture screen: {e}")
-        return False, None
-
 def capture_camera()->np.array:
     # capture frame of camera
     ret, frame = cap.read()
@@ -159,6 +146,24 @@ def capture_camera()->np.array:
         raise Exception('Fail to capture frame from camera')
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     return ret, frame
+
+def capture_screen():
+    try:
+        with mss.mss() as sct:
+            # Get information of the monitor
+            monitor = sct.monitors[1]
+            screenshot = sct.grab(monitor)
+
+            # Convert the screenshot to a numpy array
+            frame = np.array(screenshot)
+
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2RGB)
+
+            return True, frame
+    except Exception as e:
+        print(f"Failed to capture screen: {e}")
+        return False, None
+
 
 def release_camera():
     global cap
