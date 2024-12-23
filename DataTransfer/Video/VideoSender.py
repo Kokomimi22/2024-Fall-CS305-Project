@@ -45,7 +45,7 @@ class VideoSender:
             'preset': 'fast',  # 较快的编码速度
             'tune': 'zerolatency',  # 最低延迟
             'x264-params': 'nal-hrd=cbr:force-cfr=1',  # 固定比特率
-            'crf': '23',  # 压缩质量（0-51，23为默认值）
+            'crf': '25',  # 压缩质量（0-51，23为默认值）
             'profile': 'baseline',  # 基准配置，更好的兼容性
             'level': '3.0'
         }
