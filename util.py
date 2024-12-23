@@ -81,24 +81,68 @@ def overlay_camera_images(camera_images: List[np.array], grid_size=(2, 2)):
     :param grid_size: tuple, grid size (rows, columns)
     :return: np.array, combined image in numpy array format
     """
+
+    def get_fit_grid_size(num_images):
+        """
+        Get the grid size that fits the number of images.
+
+        :param num_images: int, number of images
+        :return: tuple, grid size (rows, columns)
+        """
+        rows = 1
+        cols = 1
+        while rows * cols < num_images:
+            if rows == cols:
+                cols += 1
+            else:
+                rows += 1
+        return rows, cols
+
+    def fit_to_cell(image, cell_width, cell_height):
+        image_height, image_width, _ = image.shape
+        cell_bg = np.zeros((cell_height, cell_width, 3), dtype=np.uint8)
+        if image_width / image_height > cell_width / cell_height:
+            # width determines the size
+            mid = (cell_height - image_height * cell_width // image_width) // 2
+            cell_bg[mid:mid + image_height, :] = cv2.resize(image, (cell_width, cell_height - 2 * mid))
+        else:
+            # height determines the size
+            mid = (cell_width - image_width * cell_height // image_height) // 2
+            cell_bg[:, mid:mid + image_width] = cv2.resize(image, (cell_width - 2 * mid, cell_height))
+        return cell_bg
+
     if not camera_images:
         raise ValueError("No camera images to overlay")
 
-    # Determine the size of each cell in the grid
-    cell_height, cell_width, _ = camera_images[0].shape
+    space = 10
+    margin = (10, 10, 10, 10)  # top, right, bottom, left
+    target_ratio = view_width / view_height # target aspect ratio
+    camera_height, camera_width, _ = camera_images[0].shape
+    camera_ratio = camera_width / camera_height
+    grid_rows, grid_cols = grid_size
+    if camera_ratio > target_ratio:
+        # width determines the size
+        grid_width = margin[1] + camera_width * grid_cols + space * (grid_cols - 1) + margin[3]
+        grid_height = int(grid_width / target_ratio)
+        cell_width, cell_height = camera_width, int((grid_height - margin[1] - margin[3]) / grid_rows)
+        space_v, space_h = space, (grid_height - cell_height * grid_rows - margin[0] - margin[2]) // (grid_rows - 1) if grid_rows > 1 else 0
+    else:
+        # height determines the size
+        grid_height = margin[0] + camera_height * grid_rows + space * (grid_rows - 1) + margin[2]
+        grid_width = int(grid_height * target_ratio)
+        cell_height, cell_width = camera_height, int((grid_width - margin[0] - margin[2]) / grid_cols)
+        space_v, space_h = (grid_width - cell_width * grid_cols - margin[1] - margin[3]) // (grid_cols - 1) if grid_cols > 1 else 0, space
 
-    # Create a blank image for the grid
-    grid_height = cell_height * grid_size[0]
-    grid_width = cell_width * grid_size[1]
+    # generate a black background
     grid_image = np.zeros((grid_height, grid_width, 3), dtype=np.uint8)
 
     # Paste each camera image into the grid
-    for idx, camera_image in enumerate(camera_images):
-        row = idx // grid_size[1]
-        col = idx % grid_size[1]
-        y = row * cell_height
-        x = col * cell_width
-        grid_image[y:y + cell_height, x:x + cell_width] = camera_image
+    for i, camera_image in enumerate(camera_images):
+        row = i // grid_cols
+        col = i % grid_cols
+        y = margin[0] + row * (cell_height + space_v)
+        x = margin[3] + col * (cell_width + space_h)
+        grid_image[y:y + cell_height, x:x + cell_width] = fit_to_cell(camera_image, cell_width, cell_height)
 
     return grid_image
 

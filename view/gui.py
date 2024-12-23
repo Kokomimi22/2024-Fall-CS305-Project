@@ -74,7 +74,7 @@ class Main(FluentWindow):
         # create sub interface
         self.homeInterface = HomeInterface(self)
         self.testInterface = TestInterface(self)
-        self.settingInterface = Widget('Setting Interface', self)
+        # self.settingInterface = Widget('Setting Interface', self)
 
         self.initNavigation()
         self.initWindow()
@@ -85,16 +85,17 @@ class Main(FluentWindow):
 
         self.navigationInterface.addSeparator()
 
+        self.clickedNavigationAvatarWidget = ClickedNavigationAvatarWidget('Avatar', 'Avatar')
+
         # add custom widget to bottom
         self.navigationInterface.addWidget(
             routeKey='avatar',
-            widget=ClickedNavigationAvatarWidget('zhiyiYo', 'resources/shoko.png'),
+            widget=self.clickedNavigationAvatarWidget,
             onClick=lambda : self.onNavigateChanged.emit(),
             position=NavigationItemPosition.BOTTOM,
         )
 
-        self.addSubInterface(self.settingInterface, FIF.SETTING, 'Settings', NavigationItemPosition.BOTTOM)
-
+        # self.addSubInterface(self.settingInterface, FIF.SETTING, 'Settings', NavigationItemPosition.BOTTOM)
 
         # NOTE: enable acrylic effect
         self.navigationInterface.setAcrylicEnabled(True)
@@ -102,7 +103,7 @@ class Main(FluentWindow):
     def initWindow(self):
         self.resize(900, 700)
         self.setWindowIcon(QIcon(':/qfluentwidgets/images/logo.png'))
-        self.setWindowTitle('PyQt-Fluent-Widgets')
+        self.setWindowTitle('Online Meeting')
 
         desktop = QApplication.desktop().availableGeometry()
         w, h = desktop.width(), desktop.height()
@@ -114,6 +115,9 @@ class Main(FluentWindow):
     def closeEvent(self, event):
         self.close_signal.emit()
         event.accept()
+
+    def setNavigationName(self, name: str):
+        self.clickedNavigationAvatarWidget.setName(name)
 def show():
     # enable dpi scale
     QApplication.setHighDpiScaleFactorRoundingPolicy(

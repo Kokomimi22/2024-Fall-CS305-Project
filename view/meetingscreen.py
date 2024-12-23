@@ -332,7 +332,6 @@ class CommandBarCard(CardWidget):
         self.setFixedSize(iw + 15, ih + 10)
 
 class ParticipantCardView(HeaderCardWidget):
-    # TODO: replaced by the camera area card
     def __init__(self, parent=None):
         super().__init__(parent=parent)
 
@@ -567,9 +566,7 @@ class MeetingInterfaceBase(MeetingWindow):
         # set up sub widgets
         self.displayArea = ViewWidget(self)
         self.participantsArea = ParticipantCardView(self)
-        self.participantsArea.addUnit("user1", ":/avatar/avatar_0.png")
-        self.participantsArea.addUnit("user2", ":/avatar/avatar_1.png")
-        self.participantsArea.addUnit("user3", ":/avatar/avatar_2.png")
+        self.participantsArea.hide()
         self.chatArea = ChatCardView(self)
         self.commandBar = CommandBarCard(FullCommandBar(self))
 
