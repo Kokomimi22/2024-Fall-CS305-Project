@@ -1,5 +1,6 @@
 import socket
 import threading
+import time
 
 import pyaudio
 from config import *
@@ -20,6 +21,7 @@ class AudioReceiver:
                 if not data:
                     break
             except BlockingIOError:
+                time.sleep(0.005)
                 continue
             except OSError:
                 break

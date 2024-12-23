@@ -49,6 +49,7 @@ class VideoSender:
             'profile': 'baseline',  # 基准配置，更好的兼容性
             'level': '3.0'
         }
+        stream.bit_rate = 2000000  # 设置比特率为2Mbps
         return stream
 
     def _pack_data(self, *args):
@@ -143,12 +144,7 @@ class VideoSender:
         """
         if self._running:
             self.stop_running()
-        terminate_signal = self._pack_data(0, 0, b'TERMINATE')
-        try:
-            self.sock.sendto(terminate_signal, self.target_addr)
-            self.loopback_sock.close()
-        except OSError:
-            pass
+        self.loopback_sock.close()
 
     def stop_video_send(self):
         """
@@ -160,9 +156,3 @@ class VideoSender:
         self.camera = None
         self._thread = None
         self.codec_context = self._create_codec_context()
-        stop_signal = self._pack_data(0, 0, b'END')
-        try:
-            self.sock.sendto(stop_signal, self.target_addr)
-            self.loopback_sock.sendto(stop_signal, ('127.0.0.1', self.sock.getsockname()[1]))
-        except OSError:
-            pass

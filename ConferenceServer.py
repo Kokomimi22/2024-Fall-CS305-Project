@@ -44,7 +44,6 @@ class ConferenceServer:
         Handle in-meeting requests or messages from clients.
         """
         addr = writer.get_extra_info('peername')
-        self.clients_info.append(addr)
         client_id = None
         try:
             while self.running:
@@ -60,6 +59,7 @@ class ConferenceServer:
                     client_id = request['client_id']
                     self.client_conns_text[client_id] = (reader, writer)
                     self.clients_addr['text'][client_id] = addr
+                    self.clients_info.append(addr)
                     await self.switch_mode()
                 elif request['type'] == MessageType.TEXT_MESSAGE.value:
                     sender_name = request.get('sender_name', 'undefined')
@@ -86,9 +86,7 @@ class ConferenceServer:
         except ConnectionResetError:
             print(f"Connection reset by peer {addr}")
         finally:
-            self.client_conns_text.pop(client_id, None)
-            self.clients_addr['text'].pop(client_id, None)
-            self.clients_info.remove(addr)
+            self.remove_client(client_id)
             # judge if the writer is closed
             if not writer.is_closing():
                 try:
@@ -104,11 +102,21 @@ class ConferenceServer:
                 print(f"Client {addr} has left the conference.")
             if self.mode == DistributeProtocol.PEER_TO_PEER.value:
                 self.p2p_ports.pop(client_id, None)
-                for datatype in self.data_types:
-                    self.clients_addr[datatype].pop(client_id, None)
             if self.running and client_id != self.manager_id:
-                await self.switch_mode()
+                asyncio.run_coroutine_threadsafe(self.switch_mode(), self.loop)
 
+    def remove_client(self, client_id: str):
+        """
+        Remove a client from the conference.
+        :param client_id: str
+        :return:
+        """
+        self.client_conns_text.pop(client_id, None)
+        if self.clients_addr['text'].get(client_id) in self.clients_info:
+            self.clients_info.remove(self.clients_addr['text'][client_id])
+        self.mixed_audio_buffer.pop(self.clients_addr['audio'][client_id], None)
+        for datatype in self.data_types:
+            self.clients_addr[datatype].pop(client_id, None)
 
     async def switch_mode(self):
         """
@@ -116,6 +124,8 @@ class ConferenceServer:
         :return:
         """
         num_clients = len(self.clients_info)
+        while set(map(len, self.clients_addr.values())) != {num_clients}:
+            await asyncio.sleep(0.1)
         # If there are no clients in the conference, switch to client-server mode
         if num_clients == 1:
             self.mode = DistributeProtocol.CLIENT_SERVER.value
@@ -125,9 +135,6 @@ class ConferenceServer:
             await writer.drain()
         # If there are only two clients in the conference, switch to peer-to-peer mode
         elif num_clients == 2:
-            # waiting for the another client to join the conference or leave the conference
-            while set(map(len, self.clients_addr.values())) != {2}:
-                await asyncio.sleep(1)
             self.mode = DistributeProtocol.PEER_TO_PEER.value
             # Notify all clients to switch to peer-to-peer mode
             for reader, writer in self.client_conns_text.values():
@@ -138,6 +145,7 @@ class ConferenceServer:
             # If the mode is already client-server, it does not need to switch
             if self.mode == DistributeProtocol.CLIENT_SERVER.value:
                 return
+            self.p2p_ports.clear()
             self.mode = DistributeProtocol.CLIENT_SERVER.value
             message = {'type': MessageType.SWITCH_TO_CS.value}
             for reader, writer in self.client_conns_text.values():

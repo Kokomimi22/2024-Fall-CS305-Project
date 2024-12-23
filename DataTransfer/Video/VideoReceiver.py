@@ -2,7 +2,7 @@ import math
 import socket
 import struct
 import threading
-
+import time
 
 import av
 import cv2
@@ -23,6 +23,8 @@ class VideoReceiver:
         self.frames = {}
         self._running = False
         self._thread = None
+        self.timeout = 5  # 超时时间
+        self.time_record = {} # 超时删除
         # 用于存储解码器的字典
         self.decoders: Dict[str,  av.codec.context.CodecContext] = {}
 
@@ -46,9 +48,19 @@ class VideoReceiver:
         # 设置解码器参数
         codec.options = {
             'threads': '4',  # 使用多线程解码
-            'refcounted_frames': '1'  # 使用引用计数帧
+            'refcounted_frames': '1',  # 使用引用计数帧
+            'lowres': '0',  # 禁用低分辨率解码
+            'flags': 'low_delay',  # 降低延迟
+            'flags2': 'fast'  # 使用快速解码
         }
         self.decoders[client_id] = codec
+
+    def _check_timeouts(self):
+        current_time = time.time()
+        for client_id in list(self.time_record.keys()):
+            if current_time - self.time_record[client_id] > self.timeout:
+                print(f"Client {client_id} timed out")
+                self.remove_client(client_id)
 
     def _process_data(self):
         while self._running:
@@ -57,14 +69,15 @@ class VideoReceiver:
                 if not data or data == b'Cancelled':
                     break
             except BlockingIOError:
+                time.sleep(0.005)
                 continue
             except OSError:
                 break
+            self._check_timeouts()
             client_id, data_len, sequence_number, chunk_data = self._unpack_data(data)
 
-            if chunk_data == b'TERMINATE' or chunk_data == b'END':
-                self.remove_client(client_id)
-                continue
+            # 超时删除
+            self.time_record[client_id] = time.time()
 
             # 初始化新客户端
             if client_id not in self.expected_sequences:
@@ -74,7 +87,6 @@ class VideoReceiver:
                 self._create_decoder(client_id)
 
             self.received_chunks[client_id][sequence_number] = chunk_data
-
             # 按序处理数据块
             while self.expected_sequences[client_id] in self.received_chunks[client_id]:
                 self.buffers[client_id] += self.received_chunks[client_id].pop(
@@ -102,9 +114,9 @@ class VideoReceiver:
                         if camera_images:
                             grid_size = int(math.ceil(math.sqrt(len(camera_images))))
                             grid_image = overlay_camera_images(camera_images, (grid_size, grid_size))
-                            # cv2.imshow('Video Grid', grid_image)
-                            grid_image_pil = Image.fromarray(grid_image)
-                            self.update_signal.emit(grid_image_pil)
+                            cv2.imshow('Video Grid', grid_image)
+                            # grid_image_pil = Image.fromarray(grid_image)
+                            # self.update_signal.emit(grid_image_pil)
                             if cv2.waitKey(1) & 0xFF == ord('q'):
                                 self._running = False
                                 break
@@ -121,16 +133,17 @@ class VideoReceiver:
         self.expected_sequences.pop(client_id, None)
         self.received_chunks.pop(client_id, None)
         self.frames.pop(client_id, None)
+        self.time_record.pop(client_id, None)
         # 显示所有摄像头画面
-        camera_images = list(self.frames.values())
-        if camera_images:
-            grid_size = int(math.ceil(math.sqrt(len(camera_images))))
-            grid_image = overlay_camera_images(camera_images, (grid_size, grid_size))
-            grid_image_pil = Image.fromarray(grid_image)
-            self.update_signal.emit(grid_image_pil)
-        else:
-            self.update_signal.emit(Image.new('RGB', (640, 480)))
-            print("No camera images to display")
+        # camera_images = list(self.frames.values())
+        # if camera_images:
+        #     grid_size = int(math.ceil(math.sqrt(len(camera_images))))
+        #     grid_image = overlay_camera_images(camera_images, (grid_size, grid_size))
+        #     grid_image_pil = Image.fromarray(grid_image)
+        #     self.update_signal.emit(grid_image_pil)
+        # else:
+        #     self.update_signal.emit(Image.new('RGB', (640, 480)))
+        #     print("No camera images to display")
         if not self.frames:
             print("No more frames to display")
             cv2.destroyAllWindows()
@@ -141,6 +154,7 @@ class VideoReceiver:
         self.expected_sequences.clear()
         self.received_chunks.clear()
         self.frames.clear()
+        self.time_record.clear()
 
     def start(self):
         if self._running:

@@ -365,7 +365,7 @@ class ConferenceClient:
                 'type': MessageType.INIT.value,
                 'client_id': self.userInfo.uuid
             }
-
+            time.sleep(0.3)
             for medium in ['text', 'video', 'audio']:
                 if medium == 'video':
                     self.conns[medium].sendto(json.dumps(init_request).encode(), addr_dict[medium])

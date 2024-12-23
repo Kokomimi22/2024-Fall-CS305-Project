@@ -38,10 +38,6 @@ class AudioSender:
             self.server_socket.connect(address)
 
     def terminate(self):
-        try:
-            self.server_socket.send(b'END')
-        except OSError:
-            pass
         if not self._running:
             return None
         self._running = False

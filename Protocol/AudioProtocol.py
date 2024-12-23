@@ -19,11 +19,5 @@ class AudioProtocol(DatagramProtocol):
                 self.server.clients_addr['audio'][client_id] = addr
                 self.server.mixed_audio_buffer[addr] = np.zeros(CHUNK, dtype=np.int16)
             return
-        # 处理某个客户端退出的情况
-        if data == b'END':
-            self.server.clients_addr['audio'] = \
-                {k: v for k, v in self.server.clients_addr['audio'].items() if v != addr}
-            self.server.mixed_audio_buffer.pop(addr, None)
-            return
         await self.server.handle_audio(data, addr)
 
