@@ -4,21 +4,23 @@ Including data capture, image compression and image overlap
 Note that you can use your own implementation as well :)
 """
 import socket
+import uuid
 from io import BytesIO
-
-import mss
-import pyaudio
+import platform
 import cv2
-import pyautogui
 import numpy as np
+import pyaudio
+import pyautogui
+import win32api
+import win32con
+import win32gui
+import win32ui
 from PIL import Image
-from PyQt5.QtGui import QGuiApplication, QImage
-from PyQt5.QtMultimedia import QCameraInfo, QAudioDeviceInfo, QAudio, QCamera, QCameraImageCapture, QAudioInput, \
-    QAudioFormat
+from PyQt5.QtGui import QGuiApplication
+from PyQt5.QtMultimedia import QCameraInfo, QAudioDeviceInfo, QAudio, QAudioFormat
 from deprecated.sphinx import deprecated
 
 from config import *
-import uuid
 
 # audio setting
 FORMAT = pyaudio.paInt16
@@ -50,6 +52,7 @@ else:
     can_capture_camera = False
 
 my_screen_size = pyautogui.size()
+
 
 def resize_image_to_fit_screen(image, my_screen_size):
     screen_width, screen_height = my_screen_size
@@ -139,7 +142,8 @@ def qcapture_screen():
     if screen:
         return screen.grabWindow(0).toImage()
 
-def capture_camera()->np.array:
+
+def capture_camera() -> Tuple[bool, np.array]:
     # capture frame of camera
     ret, frame = cap.read()
     if not ret:
@@ -147,19 +151,42 @@ def capture_camera()->np.array:
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     return ret, frame
 
-def capture_screen():
+
+def capture_screen() -> Tuple[bool, np.array]:
+    if platform.system() != 'Windows':
+        raise NotImplementedError("This method is only supported on Windows")
     try:
-        with mss.mss() as sct:
-            # Get information of the monitor
-            monitor = sct.monitors[1]
-            screenshot = sct.grab(monitor)
+        # 获取屏幕DC
+        hwnd = win32gui.GetDesktopWindow()
+        width = win32api.GetSystemMetrics(win32con.SM_CXVIRTUALSCREEN)
+        height = win32api.GetSystemMetrics(win32con.SM_CYVIRTUALSCREEN)
 
-            # Convert the screenshot to a numpy array
-            frame = np.array(screenshot)
+        # 创建设备上下文
+        hwndDC = win32gui.GetWindowDC(hwnd)
+        mfcDC = win32ui.CreateDCFromHandle(hwndDC)
+        saveDC = mfcDC.CreateCompatibleDC()
 
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2RGB)
+        # 创建位图对象
+        saveBitMap = win32ui.CreateBitmap()
+        saveBitMap.CreateCompatibleBitmap(mfcDC, width, height)
+        saveDC.SelectObject(saveBitMap)
 
-            return True, frame
+        # 使用BitBlt进行DMA传输
+        saveDC.BitBlt((0, 0), (width, height), mfcDC, (0, 0), win32con.SRCCOPY)
+
+        # 转换为numpy数组
+        bmpinfo = saveBitMap.GetInfo()
+        bmpstr = saveBitMap.GetBitmapBits(True)
+        frame = np.frombuffer(bmpstr, dtype=np.uint8)
+        frame = frame.reshape((height, width, 4))
+
+        # 清理资源
+        win32gui.DeleteObject(saveBitMap.GetHandle())
+        saveDC.DeleteDC()
+        mfcDC.DeleteDC()
+        win32gui.ReleaseDC(hwnd, hwndDC)
+
+        return True, cv2.cvtColor(frame, cv2.COLOR_BGRA2RGB)
     except Exception as e:
         print(f"Failed to capture screen: {e}")
         return False, None
@@ -172,8 +199,10 @@ def release_camera():
     # Reinitialize the video capture object
     cap = cv2.VideoCapture(0)
 
+
 def capture_voice():
     raise RuntimeError("This method can't be called currently")
+
 
 @deprecated(version='1.0', reason="This method is deprecated")
 def compress_image(image: Image, format='JPEG', quality=85):
@@ -191,6 +220,7 @@ def compress_image(image: Image, format='JPEG', quality=85):
 
     return img_byte_arr
 
+
 @deprecated(version='1.0', reason="This method is deprecated")
 def decompress_image(image_bytes):
     """
@@ -203,12 +233,14 @@ def decompress_image(image_bytes):
 
     return image
 
+
 def getVideoDevices():
     """
     get all video devices
     :return: list, list of video devices
     """
     return QCameraInfo.availableCameras()
+
 
 def getAudioOutputDevices():
     """
@@ -223,6 +255,7 @@ def getAudioOutputDevices():
             device_name.append(device.deviceName())
     return devices
 
+
 def getAudioInputDevices():
     """
     get all audio devices
@@ -235,6 +268,7 @@ def getAudioInputDevices():
             devices.append(device)
             device_name.append(device.deviceName())
     return devices
+
 
 def audio_data_to_volume(data):
     """
@@ -252,12 +286,14 @@ def audio_data_to_volume(data):
     int16_max_value = np.iinfo(np.int16).max
     return int(volume)
 
+
 def get_localhost_ip():
     """
     get localhost ip
     :return: str, localhost ip
     """
     return socket.gethostbyname(socket.gethostname())
+
 
 def get_available_port():
     """
@@ -269,18 +305,17 @@ def get_available_port():
     port = sock.getsockname()[1]
     sock.close()
     return port
-        
+
 
 ### UUID module ###
 class UUID:
-
     UUID_SIZE = 16
 
     def __init__(self):
         """
         default constructor, use uuid4
         """
-        self.uuids = [] # list of uuids_hex
+        self.uuids = []  # list of uuids_hex
 
     def generate_uuid(self, length=UUID_SIZE):
         """
@@ -292,7 +327,7 @@ class UUID:
             raise ValueError('length should be a positive integer')
         if length > 32:
             raise ValueError('length should be less than 32')
-    
+
         _uuid_hex = uuid.uuid4().hex[:length]
 
         while _uuid_hex in self.uuids:
@@ -309,13 +344,14 @@ class UUID:
             self.uuids.remove(uuid_hex)
         else:
             raise ValueError('uuid not found')
-    
+
     def get_uuids(self):
         """
         get all uuids
         :return: list, list of uuids in hex
         """
         return self.uuids
+
 
 for device in getAudioOutputDevices():
     print(device.deviceName())

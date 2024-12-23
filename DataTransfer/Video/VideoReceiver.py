@@ -123,7 +123,7 @@ class VideoReceiver:
                                 self._running = False
                                 break
             except Exception as e:
-                print(f"Error decoding frame: {e}")
+                pass
 
             # 清理缓冲区
             self.buffers[client_id] = b''

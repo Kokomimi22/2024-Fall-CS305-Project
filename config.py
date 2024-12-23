@@ -14,7 +14,7 @@ HELP = 'Create         : create an conference\n' \
        'Help           : show help information\n'
 
 SERVER_IP = '10.26.170.123'
-USE_GUI = False
+USE_GUI = True
 MAIN_SERVER_PORT = 8888
 TIMEOUT_SERVER = 5
 LOG_INTERVAL = 2
