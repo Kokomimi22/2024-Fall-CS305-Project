@@ -315,7 +315,6 @@ class HomeController:
 
     def handle_meeting_close(self, message_type: MessageType, _):
         if message_type == MessageType.QUIT:
-            self.meetingUI.info('info', 'Info', 'Meeting canceled soon')
             self.app.mainui.show()
             if self.meetingInterface:
                 self.meetingInterface.deleteLater()
