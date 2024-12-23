@@ -72,7 +72,6 @@ def resize_image_to_fit_screen(image, my_screen_size):
     return resized_image
 
 
-#  TODO: override this method
 def overlay_camera_images(camera_images: List[np.array], grid_size=(2, 2)):
     """
     Overlay multiple camera images into a grid.
@@ -277,6 +276,23 @@ def get_available_port():
     port = sock.getsockname()[1]
     sock.close()
     return port
+
+def qpixmap_to_ndarray(qpixmap):
+    """
+    convert qpixmap to numpy array (rgb24)
+    :param qpixmap: QPixmap, input qpixmap
+    :return: np.array, output numpy array
+    """
+    qimage = qpixmap.toImage()
+    qimage = qimage.convertToFormat(QImage.Format_RGB888)
+    width = qimage.width()
+    height = qimage.height()
+    ptr = qimage.bits()
+    ptr.setsize(qimage.byteCount())
+
+    arr = np.frombuffer(ptr, np.uint8).reshape((height, width, 3))
+
+    return cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
         
 
 ### UUID module ###

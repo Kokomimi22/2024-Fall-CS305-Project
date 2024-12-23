@@ -10,6 +10,7 @@ from DataTransfer.Video.Camera import Camera
 from DataTransfer.Video.VideoReceiver import VideoReceiver
 from DataTransfer.Video.VideoSender import VideoSender
 from common.user import User
+from component.screencapture import ScreenCapture
 from util import *
 
 
@@ -406,6 +407,19 @@ class ConferenceClient:
                 except socket.error as e:
                     print(f"[Error]: Error closing connection: {e}")
 
+    def switch_capture_mode(self, capture: ScreenCapture):
+        """
+        switch capture mode between camera and screen
+        """
+        if not self.on_meeting or not self.videoSender:
+            print(f'[Error]: You are not in a conference')
+            return
+        if not self.videoSender.isRunning():
+            print(f'[Error]: Video sender is not started')
+            return
+        self.videoSender.setCameraScreenCapture(capture)
+        print(f'[Info]: Switch capture mode')
+
     def switch_video_mode(self):
         """
         switch video mode between camera and screen
@@ -418,7 +432,7 @@ class ConferenceClient:
             return
         self.videoSender.switch_mode()
 
-    def start_video_sender(self, mode='camera'):
+    def start_video_sender(self, mode='camera', option: ScreenCapture = None):
         """
         start video sender for sharing camera data
         """
@@ -431,6 +445,8 @@ class ConferenceClient:
             return
         camera = Camera(mode)
         self.videoSender.camera = camera
+        if mode == 'screen' and option:
+            self.videoSender.setCameraScreenCapture(option)
         print(f'[Info]: Start video sender in {mode} mode')
         self.videoSender.start()
 

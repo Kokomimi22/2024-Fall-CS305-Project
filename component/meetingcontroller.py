@@ -7,6 +7,8 @@ from PyQt5.QtGui import QImage
 from qfluentwidgets import Action, FluentIcon
 
 from common.user import User
+from component.screencapture import CaptureMode, RegionCapture, WindowSelector, MaskedRegionSelector, FullScreenCapture, \
+    Result, ScreenCapture
 from config import MessageType
 from view.meetingscreen import MeetingInterfaceBase
 
@@ -33,14 +35,21 @@ class MeetingController(QObject):
         self.isSharing = False
         # connect signal
         self.meetingUI.close_signal.connect(self.closed)
-        self.meetingUI.commandBar.getCommandBar().share_signal.connect(self.handle_video_send)
-        self.meetingUI.commandBar.getCommandBar().quit_signal.connect(self.handle_quit)
-        self.meetingUI.commandBar.getCommandBar().cancel_signal.connect(self.handle_cancel)
+        self.commandBar.share_signal.connect(self.handle_video_send)
+        self.commandBar.quit_signal.connect(self.handle_quit)
+        self.commandBar.cancel_signal.connect(self.handle_cancel)
+        self.commandBar.mode_changed.connect(self.handle_capture_mode)
         self.chatArea.sendButton.clicked.connect(self.handle_message_send)
         self.message_received.connect(self.handle_message)
         self.video_received.connect(self.handle_video)
         self.audio_control.triggered.connect(self.handle_audio_toggle)
 
+        self.region_selector = MaskedRegionSelector()
+        self.window_selector = WindowSelector(self.meetingUI)
+        self.window_selector.close()
+
+        self.region_selector.result_returned.connect(self.handle_screen_capture_config)
+        self.window_selector.result_returned.connect(self.handle_screen_capture_config)
 
     def handle_message_send(self):
         try:
@@ -51,6 +60,30 @@ class MeetingController(QObject):
         except Exception as e:
             self.meetingUI.info('error', 'Error', 'Failed to send message')
             print(e)
+
+    def handle_capture_mode(self, mode: int):
+        if mode == CaptureMode.FULL_SCREEN.value:
+            self.app.send_video_start('screen', FullScreenCapture())
+            print('region', FullScreenCapture())
+        elif mode == CaptureMode.REGION.value:
+            self.region_selector = MaskedRegionSelector()
+            self.region_selector.result_returned.connect(self.handle_screen_capture_config)
+            self.region_selector.show()
+        elif mode == CaptureMode.WINDOW.value:
+            self.window_selector.show()
+
+    def handle_screen_capture_config(self, config: Result):
+        if config.mode == CaptureMode.WINDOW:
+            self.app.send_video_start('screen', ScreenCapture.fromResult(config))
+            print('window', config)
+        elif config.mode == CaptureMode.FULL_SCREEN:
+            self.app.send_video_start('screen', ScreenCapture.fromResult(config))
+            print('full screen', config)
+        elif config.mode == CaptureMode.REGION:
+            self.app.send_video_start('screen', ScreenCapture.fromResult(config))
+            print('region', config)
+        else:
+            print('Invalid capture mode')
 
     def handle_video_send(self, str):
         try:

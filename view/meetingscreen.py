@@ -2,6 +2,7 @@ import math
 import sys
 from enum import Enum
 
+from PIL.ImageChops import screen
 from PyQt5.QtCore import Qt, QRectF, pyqtSignal, QSize
 from PyQt5.QtGui import QFont, QColor, QIcon, QImage, QPainter, QPainterPath
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QGridLayout, QFrame, QSizePolicy, \
@@ -218,6 +219,7 @@ class FullCommandBar(CommandBar):
 
     share_signal = pyqtSignal(str)
     speak_signal = pyqtSignal(bool)
+    mode_changed = pyqtSignal(int)
     quit_signal = pyqtSignal()
     cancel_signal = pyqtSignal()
 
@@ -252,29 +254,28 @@ class FullCommandBar(CommandBar):
         self.resizeToSuitableWidth()
 
     def _init_share_menu(self):
-        actionGroup = QActionGroup(self)
-        actionGroup.setExclusive(True)
+        actiongroup = QActionGroup(self)
+        actiongroup.setExclusive(True)
+        action1 = Action(FluentIcon.PAUSE, 'Don\'t Share', triggered=lambda : self.share_signal.emit('stop'))
+        action3 = Action(FluentIcon.CAMERA, 'Camera', triggered=lambda : self.share_signal.emit('camera'))
 
-        action1 = Action(FluentIcon.PAUSE, 'Don\'t Share', triggered=lambda : self.share_signal.emit('stop'), checkable=True)
-        action2 = Action(FluentIcon.VIDEO, 'Screen', triggered=lambda : self.share_signal.emit('screen'), checkable=True)
-        action3 = Action(FluentIcon.CAMERA, 'Camera', triggered=lambda : self.share_signal.emit('camera'), checkable=True)
-        actionGroup.addAction(action1)
-        actionGroup.addAction(action2)
-        actionGroup.addAction(action3)
+        self.screen_submenu = CheckableMenu("Screen", self, indicatorType=MenuIndicatorType.RADIO)
+        self.screen_submenu.setIcon(FluentIcon.VIDEO)
 
-        self.share_menu.addActions([
-            action1, action2, action3
-        ])
+        action4 = Action(text='Full Screen', triggered=lambda : self.mode_changed.emit(1), checkable=True)
+        action5 = Action(text='Region', triggered=lambda : self.mode_changed.emit(3), checkable=True)
+        action6 = Action(text='Window', triggered=lambda : self.mode_changed.emit(2), checkable=True)
+        self.screen_submenu.addActions([action4, action5, action6])
+        actiongroup.addAction(action4)
+        actiongroup.addAction(action5)
+        actiongroup.addAction(action6)
 
-        action1.setChecked(True)
+        self.share_menu.addAction(action1)
+        self.share_menu.addMenu(self.screen_submenu)
+        self.share_menu.addAction(action3)
 
     def setSpeak(self, isSpeaking):
         self.speak_action.setIcon(MeetingIcon.STOP_SPEAK if isSpeaking else FluentIcon.MICROPHONE)
-
-    def share_menu_event(self, checked):
-        if checked:
-            pos = self.mapToGlobal(self.sender().pos())
-            self.share_menu.exec(pos)
 
     def getAction(self, key):
         """
@@ -289,25 +290,6 @@ class FullCommandBar(CommandBar):
         if action:
             self.removeAction(action)
         self.resizeToSuitableWidth()
-
-    def share(self):
-        pass
-
-    def speak(self):
-        pass
-
-    def mute(self):
-        pass
-
-    def volume(self):
-        pass
-
-    def leave(self):
-        pass
-
-    def end(self):
-        pass
-
 
 class CommandBarCard(CardWidget):
     def __init__(self, commandBar, parent=None):

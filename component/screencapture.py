@@ -2,15 +2,20 @@ from enum import Enum
 from tkinter.ttk import Combobox
 
 import PIL.Image
+import numpy as np
 import psutil
 import win32con
 import win32gui
 import win32process
 from PyQt5.QtCore import Qt, pyqtSignal, QRect, QRectF
+from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QPainter, QPen, QColor, QBrush, QWindow, QScreen
 from PyQt5.QtWidgets import QFrame, QVBoxLayout
+from PyQt5.sip import voidptr
 from qfluentwidgets import CommandBarView, BodyLabel, Action, FluentIcon, CommandBar, MessageBox, MessageBoxBase, \
     ComboBox, SubtitleLabel
+
+from util import qpixmap_to_ndarray
 
 
 class CaptureMode(Enum):
@@ -171,7 +176,6 @@ class MaskedRegionSelector(QFrame):
             painter.drawRect(self.selection_rect)
 
     def closeEvent(self, a0):
-        self.setWindowState(Qt.WindowNoState)
         super().closeEvent(a0)
         a0.accept()
 
@@ -272,19 +276,36 @@ class ScreenCapture:
     def __init__(self):
         pass
 
-    def capture(self) -> PIL.Image:
-        pass
+    def capture(self) -> (bool, np.array):
+        raise NotImplementedError("capture() method must be implemented")
+
+    @classmethod
+    def fromResult(cls, result: Result) -> 'ScreenCapture':
+        if result.getType() == CaptureMode.FULL_SCREEN:
+            return FullScreenCapture()
+        elif result.getType() == CaptureMode.WINDOW:
+            return WindowCapture(result.unpack())
+        elif result.getType() == CaptureMode.REGION:
+            x, y, width, height = result.unpack()
+            return RegionCapture(x, y, width, height)
+        else:
+            raise ValueError("Invalid capture mode")
 
 class WindowCapture(ScreenCapture):
     def __init__(self, window_id: int = None):
         super().__init__()
         self.window_id = window_id
 
-    def capture(self) -> PIL.Image:
+    def capture(self) -> (bool, np.array):
         if self.window_id:
             screen = QApplication.primaryScreen()
-            image = screen.grabWindow(self.window_id).toImage()
-            return image
+            image = screen.grabWindow(self.window_id)
+            image = image.copy(image.rect())
+            image.save("test_window.png", format="png")
+            array = qpixmap_to_ndarray(image)
+            return True, array
+        else:
+            return False, None
 
 class RegionCapture(ScreenCapture):
     def __init__(self, x: int, y: int, width: int, height: int):
@@ -294,19 +315,24 @@ class RegionCapture(ScreenCapture):
         self.width = width
         self.height = height
 
-    def capture(self) -> PIL.Image:
+    def capture(self) -> (bool, np.array):
         screen = QApplication.primaryScreen()
-        image = screen.grabWindow(QWindow().winId(), self.x, self.y, self.width, self.height).toImage()
-        return image
+        image = screen.grabWindow(0, self.x, self.y, self.width, self.height)
+        image = image.copy(image.rect())
+        image.save("test_region.png")
+        array = qpixmap_to_ndarray(image)
+        return True, array
 
 class FullScreenCapture(ScreenCapture):
     def __init__(self):
         super().__init__()
 
-    def capture(self) -> PIL.Image:
+    def capture(self) -> (bool, np.array):
         screen = QApplication.primaryScreen()
-        image = screen.grabWindow(QWindow().winId()).toImage()
-        return image
+        image = screen.grabWindow(0)
+        image = image.copy(image.rect())
+        array = qpixmap_to_ndarray(image)
+        return True, array
 
 if __name__ == '__main__':
     import sys
@@ -326,4 +352,3 @@ if __name__ == '__main__':
     #     sys.exit(0)
     # else:
     #     sys.exit(1)
-

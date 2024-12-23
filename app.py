@@ -10,6 +10,7 @@ from component.audiopreview import AudioPreview
 from component.meetingcardgroup import MeetingCardsGroupHandler
 from component.meetingcontroller import MeetingController
 from component.meetingcreate import MeetingCreate
+from component.screencapture import ScreenCapture
 from component.videopreview import VideoPreview
 from config import *
 from view.gui import LoginWindow
@@ -107,8 +108,8 @@ class AppController(QObject):
     def send_text_message(self, message):
         conf_client.send_message(message)
 
-    def send_video_start(self, video_type='camera'):
-        conf_client.start_video_sender(video_type)
+    def send_video_start(self, video_type='camera', option: ScreenCapture=None):
+        conf_client.start_video_sender(video_type, option)
 
     def send_video_stop(self):
         conf_client.stop_video_sender()

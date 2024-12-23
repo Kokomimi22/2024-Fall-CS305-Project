@@ -1,12 +1,15 @@
 import threading
 import time
 from os import fspath
+from typing import Optional
 
+from component.screencapture import ScreenCapture
 from util import capture_camera, release_camera, capture_screen
 
 class Camera:
     def __init__(self, mode='camera', fps=30):
         self.frame = (False, None)
+        self.screen_capture: Optional[ScreenCapture] = None
         self.lock = threading.Lock()
         self.running = True
         self.mode = mode
@@ -15,13 +18,16 @@ class Camera:
         self.thread = threading.Thread(target=self.update_frame)
         self.thread.start()
 
+    def setScreenCapture(self, screen_capture: ScreenCapture):
+        self.screen_capture = screen_capture
+
     def update_frame(self):
         while self.running:
             start_time = time.time()
             if self.mode == 'camera':
                 ret, frame = capture_camera()
-            elif self.mode == 'screen':
-                ret, frame = capture_screen()
+            elif self.mode == 'screen' and self.screen_capture:
+                ret, frame = self.screen_capture.capture()
             else:
                 ret, frame = False, None
 

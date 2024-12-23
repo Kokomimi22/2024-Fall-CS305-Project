@@ -25,6 +25,9 @@ class VideoSender:
         # 初始化编码器
         self.codec_context = self._create_codec_context()
 
+    def setCameraScreenCapture(self, screenCapture):
+        self.camera.setScreenCapture(screenCapture)
+
     def isRunning(self):
         return self._running
 
