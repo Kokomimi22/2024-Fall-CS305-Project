@@ -121,7 +121,7 @@ class VideoReceiver:
         self.expected_sequences.pop(client_id, None)
         self.received_chunks.pop(client_id, None)
         self.frames.pop(client_id, None)
-        # 显示所有摄像头画面
+        #显示所有摄像头画面
         # camera_images = list(self.frames.values())
         # if camera_images:
         #     grid_size = int(math.ceil(math.sqrt(len(camera_images))))

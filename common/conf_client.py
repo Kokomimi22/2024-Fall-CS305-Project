@@ -179,7 +179,11 @@ class ConferenceClient:
     def recv_conference_task(self):
         """处理普通会议消息的接收任务"""
         while self.on_meeting:
-            _recv_data = self.conns['text'].recv(DATA_LINE_BUFFER)
+            try:
+                _recv_data = self.conns['text'].recv(DATA_LINE_BUFFER)
+            except ConnectionResetError:
+                print(f'[Info]: Server disconnected')
+                break
             # 检查是否退出会议
             if not _recv_data or _recv_data == b'Quitted' or _recv_data == b'Cancelled':
                 if self.update_signal.get('control'):
@@ -242,6 +246,9 @@ class ConferenceClient:
                 _recv_data = self.conns['p2p'].recv(DATA_LINE_BUFFER)
             except BlockingIOError:
                 continue
+            except ConnectionResetError:
+                print(f'[Info]: Peer disconnected')
+                break
             if not _recv_data:
                 break
             # 解析和处理消息
