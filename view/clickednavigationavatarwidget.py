@@ -11,11 +11,15 @@ class ClickedNavigationAvatarWidget(NavigationAvatarWidget):
     def __init__(self, name: str, avatarPath: str, parent=None):
         super().__init__(name, avatarPath, parent)
         self.menu = None
+        self.name = name
+
+    def setName(self, name: str):
+        self.name = name
 
     def mousePressEvent(self, e):
         super().mousePressEvent(e)
         if e.button() == Qt.LeftButton:
-            self.createProfileWidget(e)
+            self.createProfileWidget(e, name=self.name)
 
     class ProfileCard(QWidget):
 

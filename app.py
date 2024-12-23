@@ -203,6 +203,7 @@ class LoginController:
             self.loginui.info('success', 'Success', 'Login successfully')
             self.remember()
             self.switch_to_main()
+            self.app.mainui.setNavigationName(username)
         else:
             self.loginui.info('error', 'Error', 'Failed to login')
 
@@ -314,6 +315,7 @@ class HomeController:
 
     def handle_meeting_close(self, message_type: MessageType, _):
         if message_type == MessageType.QUIT:
+            self.meetingUI.info('info', 'Info', 'Meeting canceled soon')
             self.app.mainui.show()
             if self.meetingInterface:
                 self.meetingInterface.deleteLater()

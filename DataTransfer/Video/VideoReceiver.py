@@ -102,9 +102,9 @@ class VideoReceiver:
                         if camera_images:
                             grid_size = int(math.ceil(math.sqrt(len(camera_images))))
                             grid_image = overlay_camera_images(camera_images, (grid_size, grid_size))
-                            cv2.imshow('Video Grid', grid_image)
-                            # grid_image_pil = Image.fromarray(grid_image)
-                            # self.update_signal.emit(grid_image_pil)
+                            # cv2.imshow('Video Grid', grid_image)
+                            grid_image_pil = Image.fromarray(grid_image)
+                            self.update_signal.emit(grid_image_pil)
                             if cv2.waitKey(1) & 0xFF == ord('q'):
                                 self._running = False
                                 break
@@ -121,16 +121,16 @@ class VideoReceiver:
         self.expected_sequences.pop(client_id, None)
         self.received_chunks.pop(client_id, None)
         self.frames.pop(client_id, None)
-        #显示所有摄像头画面
-        # camera_images = list(self.frames.values())
-        # if camera_images:
-        #     grid_size = int(math.ceil(math.sqrt(len(camera_images))))
-        #     grid_image = overlay_camera_images(camera_images, (grid_size, grid_size))
-        #     grid_image_pil = Image.fromarray(grid_image)
-        #     self.update_signal.emit(grid_image_pil)
-        # else:
-        #     self.update_signal.emit(Image.new('RGB', (640, 480)))
-        #     print("No camera images to display")
+        # 显示所有摄像头画面
+        camera_images = list(self.frames.values())
+        if camera_images:
+            grid_size = int(math.ceil(math.sqrt(len(camera_images))))
+            grid_image = overlay_camera_images(camera_images, (grid_size, grid_size))
+            grid_image_pil = Image.fromarray(grid_image)
+            self.update_signal.emit(grid_image_pil)
+        else:
+            self.update_signal.emit(Image.new('RGB', (640, 480)))
+            print("No camera images to display")
         if not self.frames:
             print("No more frames to display")
             cv2.destroyAllWindows()

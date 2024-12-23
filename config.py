@@ -30,6 +30,7 @@ SUCCESSFUL = True
 FAILED = False
 camera_width, camera_height = 640, 480  # resolution for camera capture
 VIDEO_CHUNK_SIZE = 8192  # UDP
+view_width, view_height = 960, 540  # resolution for video display
 
 
 class MessageType(Enum):

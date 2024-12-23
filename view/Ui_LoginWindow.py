@@ -125,9 +125,6 @@ class Ui_Form(object):
         self.gridLayout_2.addWidget(self.pushButton_3, 0, 1, 1, 1)
         spacerItem4 = QtWidgets.QSpacerItem(20, 6, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
         self.verticalLayout_2.addItem(spacerItem4)
-        self.pushButton_2 = HyperlinkButton(self.widget)
-        self.pushButton_2.setObjectName("pushButton_2")
-        self.verticalLayout_2.addWidget(self.pushButton_2)
         spacerItem5 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.verticalLayout_2.addItem(spacerItem5)
         self.horizontalLayout.addWidget(self.widget)
@@ -148,7 +145,6 @@ class Ui_Form(object):
         self.lineEdit_4.setPlaceholderText(_translate("Form", "••••••••••••"))
         self.checkBox.setText(_translate("Form", "记住密码"))
         self.pushButton.setText(_translate("Form", "登录"))
-        self.pushButton_2.setText(_translate("Form", "找回密码"))
         self.pushButton_3.setText(_translate("Form", "注册"))
 
 
