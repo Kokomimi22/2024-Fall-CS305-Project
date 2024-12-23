@@ -225,14 +225,14 @@ class ConferenceServer:
             print(f"Failed to cancel conference {self.conference_id}.")
 
     def start(self):
-        text_server_coro = asyncio.start_server(self.handle_client, '127.0.0.1', self.conf_serve_port)
+        text_server_coro = asyncio.start_server(self.handle_client, SERVER_IP, self.conf_serve_port)
         video_server_coro = self.loop.create_datagram_endpoint(
             lambda: VideoProtocol(self),
-            local_addr=('127.0.0.1', self.data_serve_ports['video'])
+            local_addr=(SERVER_IP, self.data_serve_ports['video'])
         )
         audio_server_coro = self.loop.create_datagram_endpoint(
             lambda: AudioProtocol(self),
-            local_addr=('127.0.0.1', self.data_serve_ports['audio'])
+            local_addr=(SERVER_IP, self.data_serve_ports['audio'])
         )
         text_server = self.loop.run_until_complete(text_server_coro)
         self.transport['video'], _ = self.loop.run_until_complete(video_server_coro)

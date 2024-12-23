@@ -13,7 +13,7 @@ HELP = 'Create         : create an conference\n' \
        'Exit           : exit the program\n' \
        'Help           : show help information\n'
 
-SERVER_IP = '127.0.0.1'
+SERVER_IP = '10.26.170.123'
 MAIN_SERVER_PORT = 8888
 TIMEOUT_SERVER = 5
 LOG_INTERVAL = 2
