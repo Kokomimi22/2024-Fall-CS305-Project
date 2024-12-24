@@ -6,6 +6,7 @@ import time
 
 import av
 import cv2
+import select
 from PIL import Image
 from PyQt5.QtCore import pyqtSignal
 from config import *
@@ -64,13 +65,14 @@ class VideoReceiver:
     def _process_data(self):
         while self._running:
             try:
-                data, _ = self.sock.recvfrom(65536)
-                if not data or data == b'Cancelled':
-                    break
-            except BlockingIOError:
-                self._check_timeouts()
-                time.sleep(1e-3)
-                continue
+                ready = select.select([self.sock], [], [], 1)
+                if ready[0]:
+                    data, _ = self.sock.recvfrom(65536)
+                    if not data or data == b'Cancelled':
+                        break
+                else:
+                    self._check_timeouts()
+                    continue
             except OSError:
                 break
             self._check_timeouts()
