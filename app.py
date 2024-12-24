@@ -349,33 +349,13 @@ from PyQt5.QtCore import Qt, QLocale
 from PyQt5.QtWidgets import QApplication, QMessageBox
 from qfluentwidgets import FluentTranslator
 
-def handle_exception(exc_type, exc_value, exc_traceback):
-    if issubclass(exc_type, KeyboardInterrupt):
-        sys.__excepthook__(exc_type, exc_value, exc_traceback)
-        return
-
-    error_message = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
-    print(error_message)  # 打印到控制台
-
-    # 显示错误消息框
-    msg_box = QMessageBox()
-    msg_box.setIcon(QMessageBox.Critical)
-    msg_box.setText("An unexpected error occurred")
-    msg_box.setInformativeText(str(exc_value))
-    msg_box.setDetailedText(error_message)
-    msg_box.setWindowTitle("Error")
-    msg_box.exec_()
-
-
 if __name__ == '__main__':
-    sys.excepthook = handle_exception
+    sys.excepthook = excepthook
     # enable dpi scale
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
-
-    sys.excepthook = excepthook
     app = QApplication(sys.argv)
 
     # Internationalization
