@@ -153,6 +153,7 @@ class AppController(QObject):
         self.logincontol.register_all_action()
 
     def close(self):
+        conf_client.logout()
         self.mainui.close()
         self.loginui.close()
 
@@ -162,13 +163,15 @@ class AppController(QObject):
         print("Application is closing. Performing cleanup...")
 
         # 停止音频、视频等服务
-        self.send_audio_stop()
-        self.send_video_stop()
 
         try:
-            conf_client.logout()  # 断开与服务器的连接
+            # 断开与服务器的连接
+            self.send_audio_stop()
+            self.send_video_stop()
         except Exception as e:
             print(f"Error disconnecting from server: {e}")
+        finally:
+            conf_client.logout()
 
 class LoginController:
     def __init__(self, loginui: LoginWindow, app: AppController):
