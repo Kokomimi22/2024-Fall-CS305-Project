@@ -50,7 +50,7 @@ class VideoReceiver:
             'threads': '4',  # 使用多线程解码
             'refcounted_frames': '1',  # 使用引用计数帧
             'flags': 'low_delay',  # 降低延迟
-            'flags2': 'fast'  # 使用快速解码
+             #'flags2': 'fast'  # 使用快速解码
         }
         self.decoders[client_id] = codec
 
@@ -123,10 +123,6 @@ class VideoReceiver:
                             if cv2.waitKey(1) & 0xFF == ord('q'):
                                 self._running = False
                                 break
-            except av.AVError as e:
-                print(f"Decoding error: {e}")
-                # 重置解码器
-                continue
             except Exception as e:
                 pass
 
