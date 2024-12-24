@@ -123,6 +123,13 @@ class VideoReceiver:
                             if cv2.waitKey(1) & 0xFF == ord('q'):
                                 self._running = False
                                 break
+            except av.AVError as e:
+                print(f"Decoding error: {e}")
+                # 重置解码器
+                self._create_decoder(client_id)
+                self.buffers[client_id] = b''
+                self.expected_sequences[client_id] = 0
+                continue
             except Exception as e:
                 pass
 
