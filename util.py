@@ -148,7 +148,8 @@ def capture_camera() -> Tuple[bool, np.array]:
     # capture frame of camera
     ret, frame = cap.read()
     if not ret:
-        raise Exception('Fail to capture frame from camera')
+        print('Fail to capture frame from camera')
+        return False, None
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     return ret, frame
 
