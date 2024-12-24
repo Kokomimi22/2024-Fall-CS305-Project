@@ -1,7 +1,6 @@
 import asyncio
 from asyncio import StreamWriter, StreamReader, AbstractEventLoop
 
-from win32trace import write
 
 from Protocol.AudioProtocol import AudioProtocol
 from Protocol.VideoProtocol import VideoProtocol
@@ -103,6 +102,8 @@ class ConferenceServer:
                 print(f"Client {addr} has left the conference.")
             if self.mode == DistributeProtocol.PEER_TO_PEER.value:
                 self.p2p_ports.pop(client_id, None)
+            if self.running and client_id == self.manager_id:
+                asyncio.run_coroutine_threadsafe(self.stop(), self.loop)
             if self.running and client_id != self.manager_id:
                 asyncio.run_coroutine_threadsafe(self.switch_mode(), self.loop)
 
@@ -115,7 +116,8 @@ class ConferenceServer:
         self.client_conns_text.pop(client_id, None)
         if self.clients_addr['text'].get(client_id) in self.clients_info:
             self.clients_info.remove(self.clients_addr['text'][client_id])
-        self.mixed_audio_buffer.pop(self.clients_addr['audio'][client_id], None)
+        if self.clients_addr['audio'].get(client_id):
+            self.mixed_audio_buffer.pop(self.clients_addr['audio'][client_id], None)
         for datatype in self.data_types:
             self.clients_addr[datatype].pop(client_id, None)
 
