@@ -11,7 +11,7 @@ from config import *
 
 
 class VideoSender:
-    def __init__(self, camera, socket_connection: socket.socket, client_id: str=None, target_addr: Tuple[str, int] = None, frame_rate: int=30):
+    def __init__(self, camera, socket_connection: socket.socket, client_id: str=None, target_addr: Tuple[str, int] = None, frame_rate: int=20):
         self.camera = camera
         self.client_id = client_id.encode('utf-8') if client_id else b''
         self.frame_rate = frame_rate
@@ -42,16 +42,12 @@ class VideoSender:
 
         # 设置编码器参数
         stream.options = {
-            'preset': 'fast',
-            'tune': 'zerolatency',
-            'x264-params': 'nal-hrd=cbr:force-cfr=1',
-            'crf': '25',
-            'profile': 'baseline',
-            'level': '3.0',
-            'keyint': '30',  # 增加关键帧频率
-            'min-keyint': '30',  # 最小关键帧间隔
-            'intra-refresh': '1',  # 启用渐进式刷新
-            'ref': '1'  # 减少参考帧数量
+            'preset': 'fast',  # 较快的编码速度
+            'tune': 'zerolatency',  # 最低延迟
+            'x264-params': 'nal-hrd=cbr:force-cfr=1',  # 固定比特率
+            'crf': '25',  # 压缩质量（0-51，23为默认值）
+            'profile': 'baseline',  # 基准配置，更好的兼容性
+            'level': '3.0'
         }
         stream.bit_rate = 2000000  # 设置比特率为2Mbps
         return stream

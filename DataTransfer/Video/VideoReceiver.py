@@ -126,9 +126,6 @@ class VideoReceiver:
             except av.AVError as e:
                 print(f"Decoding error: {e}")
                 # 重置解码器
-                self._create_decoder(client_id)
-                self.buffers[client_id] = b''
-                self.expected_sequences[client_id] = 0
                 continue
             except Exception as e:
                 pass
