@@ -118,6 +118,7 @@ class VideoReceiver:
                                 grid_image_pil = Image.fromarray(grid_image)
                                 self.update_signal.emit(grid_image_pil)
                             else:
+                                grid_image = cv2.cvtColor(grid_image, cv2.COLOR_RGB2BGR)
                                 cv2.imshow('Video Grid', grid_image)
                             if cv2.waitKey(1) & 0xFF == ord('q'):
                                 self._running = False
