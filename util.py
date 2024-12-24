@@ -8,6 +8,7 @@ import uuid
 from io import BytesIO
 import platform
 import cv2
+import mss
 import numpy as np
 import pyaudio
 import pyautogui
@@ -152,41 +153,19 @@ def capture_camera() -> Tuple[bool, np.array]:
     return ret, frame
 
 
-def capture_screen() -> Tuple[bool, np.array]:
-    if platform.system() != 'Windows':
-        raise NotImplementedError("This method is only supported on Windows")
+def capture_screen():
     try:
-        # 获取屏幕DC
-        hwnd = win32gui.GetDesktopWindow()
-        width = win32api.GetSystemMetrics(win32con.SM_CXVIRTUALSCREEN)
-        height = win32api.GetSystemMetrics(win32con.SM_CYVIRTUALSCREEN)
+        with mss.mss() as sct:
+            # Get information of the monitor
+            monitor = sct.monitors[1]
+            screenshot = sct.grab(monitor)
 
-        # 创建设备上下文
-        hwndDC = win32gui.GetWindowDC(hwnd)
-        mfcDC = win32ui.CreateDCFromHandle(hwndDC)
-        saveDC = mfcDC.CreateCompatibleDC()
+            # Convert the screenshot to a numpy array
+            frame = np.array(screenshot)
 
-        # 创建位图对象
-        saveBitMap = win32ui.CreateBitmap()
-        saveBitMap.CreateCompatibleBitmap(mfcDC, width, height)
-        saveDC.SelectObject(saveBitMap)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2RGB)
 
-        # 使用BitBlt进行DMA传输
-        saveDC.BitBlt((0, 0), (width, height), mfcDC, (0, 0), win32con.SRCCOPY)
-
-        # 转换为numpy数组
-        bmpinfo = saveBitMap.GetInfo()
-        bmpstr = saveBitMap.GetBitmapBits(True)
-        frame = np.frombuffer(bmpstr, dtype=np.uint8)
-        frame = frame.reshape((height, width, 4))
-
-        # 清理资源
-        win32gui.DeleteObject(saveBitMap.GetHandle())
-        saveDC.DeleteDC()
-        mfcDC.DeleteDC()
-        win32gui.ReleaseDC(hwnd, hwndDC)
-
-        return True, cv2.cvtColor(frame, cv2.COLOR_BGRA2RGB)
+            return True, frame
     except Exception as e:
         print(f"Failed to capture screen: {e}")
         return False, None
