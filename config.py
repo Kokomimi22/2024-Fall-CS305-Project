@@ -13,7 +13,7 @@ HELP = 'Create         : create an conference\n' \
        'Exit           : exit the program\n' \
        'Help           : show help information\n'
 
-SERVER_IP = '10.26.170.123'
+SERVER_IP = '127.0.0.1'
 USE_GUI = True
 MAIN_SERVER_PORT = 8888
 TIMEOUT_SERVER = 5
@@ -29,7 +29,7 @@ SAMPLE_SIZE = 16  # Sample size for audio capture
 CODE_C = 'audio/pcm'  # Codec for audio capture
 SUCCESSFUL = True
 FAILED = False
-camera_width, camera_height = 640, 480  # resolution for camera and screen capture
+camera_width, camera_height = 960, 540   # resolution for camera and screen capture
 VIDEO_CHUNK_SIZE = 8192  # UDP
 view_width, view_height = 960, 540  # resolution for video display
 

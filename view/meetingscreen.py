@@ -149,6 +149,9 @@ class ViewWidget(QWidget):
     def fit_image(self, image):
         w, h = self.width(), self.height()
         # resize the image to fit the height of the widget, add black padding to the left and right
+        if image.height() == h and image.width() == w:
+            return image
+
         image = image.scaledToHeight(h, Qt.SmoothTransformation)
 
         if image.width() < w:
@@ -156,6 +159,16 @@ class ViewWidget(QWidget):
             padding.fill(Qt.black)
             painter = QPainter(padding)
             painter.drawImage((w - image.width()) // 2, 0, image)
+            painter.end()
+            image = padding
+        elif image.width() == w:
+            pass
+        else:
+            image = image.scaledToWidth(w, Qt.SmoothTransformation)
+            padding = QImage(w, h, QImage.Format_RGB32)
+            padding.fill(Qt.black)
+            painter = QPainter(padding)
+            painter.drawImage(0, (h - image.height()) // 2, image)
             painter.end()
             image = padding
         return image
