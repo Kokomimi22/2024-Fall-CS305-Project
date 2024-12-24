@@ -6,16 +6,12 @@ Note that you can use your own implementation as well :)
 import socket
 import uuid
 from io import BytesIO
-import platform
+
 import cv2
 import mss
 import numpy as np
 import pyaudio
 import pyautogui
-import win32api
-import win32con
-import win32gui
-import win32ui
 from PIL import Image
 from PyQt5.QtGui import QGuiApplication
 from PyQt5.QtMultimedia import QCameraInfo, QAudioDeviceInfo, QAudio, QAudioFormat

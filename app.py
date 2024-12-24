@@ -343,7 +343,7 @@ def excepthook(exc_type, exc_value, exc_tb):
                 f"Traceback: {exc_tb}"
     print(message)
     try:
-        conf_client.quit_conference()
+        conf_client.logout()
     except Exception as e:
         print(f"Error disconnecting from server: {e}")
     sys.__excepthook__(exc_type, exc_value, exc_tb)
