@@ -191,7 +191,7 @@ class ConferenceClient:
 
                 if message['type'] == MessageType.TEXT_MESSAGE.value:
                     if self.update_signal.get('text'):
-                        self.update_signal['text'].emit(message['sender_name'], message['message'])
+                        self.update_signal['text'].emit(message['sender_name'], message['message'], message['timestamp'])
                     print(f'{message["sender_name"]} ({message["timestamp"]}): {message["message"]}')
 
                 elif message['type'] == MessageType.SWITCH_TO_P2P.value:
