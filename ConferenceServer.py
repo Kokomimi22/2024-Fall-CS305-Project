@@ -63,7 +63,8 @@ class ConferenceServer:
                     await self.switch_mode()
                 elif request['type'] == MessageType.TEXT_MESSAGE.value:
                     sender_name = request.get('sender_name', 'undefined')
-                    await self.emit_message(request['message'], sender_name, writer)
+                    timestamp = request.get('timestamp')
+                    await self.emit_message(request['message'], sender_name, timestamp, writer)
                 elif request['type'] == MessageType.P2P_INFOS_NOTIFICATION.value:
                     self.p2p_ports[client_id] = request['p2p_info']
                     # notify another client his peer's info
@@ -152,14 +153,15 @@ class ConferenceServer:
                 writer.write(json.dumps(message).encode())
                 await writer.drain()
 
-    async def emit_message(self, message: str, sender_name: str, sender: StreamWriter):
+    async def emit_message(self, message: str, sender_name: str, timestamp: str, sender: StreamWriter):
         """
         Send a message to all clients in the conference.
         """
         emit_message = {
             'type': MessageType.TEXT_MESSAGE.value,
             'message': message,
-            'sender_name': sender_name
+            'sender_name': sender_name,
+            'timestamp': timestamp
         }
         for client_reader, client_writer in self.client_conns_text.values():
             if client_writer != sender:

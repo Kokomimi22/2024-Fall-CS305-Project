@@ -15,13 +15,6 @@ class MeetingCardsGroupHandler(QObject):
         # connect signal
         self.view.scroll_area_entered.connect(self.flush_meeting_cards)
 
-        # initial flush
-        self.flush_meeting_cards()
-
-    # test function
-    def flush(self):
-        print('flushing meeting cards')
-
     def flush_meeting_cards(self):
         next_meetings, details = self.app.get_meetings()
         add_meetings = list(set(next_meetings) - set(self.meetings))

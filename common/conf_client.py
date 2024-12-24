@@ -168,10 +168,12 @@ class ConferenceClient:
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
             return
+        timestamp = time.strftime('%H:%M:%S', time.localtime(time.time()))
         message_post = {
             'type': MessageType.TEXT_MESSAGE.value,
             'sender_name': self.userInfo.username,
-            'message': message
+            'message': message,
+            'timestamp': timestamp
         }
         connection = self.conns['p2p'] if self.is_p2p else self.conns['text']
         connection.sendall(json.dumps(message_post).encode())
@@ -199,7 +201,7 @@ class ConferenceClient:
                 if message['type'] == MessageType.TEXT_MESSAGE.value:
                     if self.update_signal.get('text'):
                         self.update_signal['text'].emit(message['sender_name'], message['message'])
-                    print(f'{message["sender_name"]}: {message["message"]}')
+                    print(f'{message["sender_name"]} ({message["timestamp"]}): {message["message"]}')
 
                 elif message['type'] == MessageType.SWITCH_TO_P2P.value:
                     self.conns['p2p'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -257,7 +259,7 @@ class ConferenceClient:
 
                 if message['type'] == MessageType.TEXT_MESSAGE.value:
                     if self.update_signal.get('text'):
-                        self.update_signal['text'].emit(message['sender_name'], message['message'])
+                        self.update_signal['text'].emit(message['sender_name'], message['message'], message['timestamp'])
                     print(f'{message["sender_name"]}: {message["message"]}')
 
                 else:
@@ -522,7 +524,7 @@ class ConferenceClient:
 
     def set_controller(self, app):
         self.update_signal = {
-            'text': app.message_received,  # type: pyqtSignal(str, str)
+            'text': app.message_received,  # type: pyqtSignal(str, str, str)
             'video': app.video_received,  # type: pyqtSignal(Image)
             'control': app.control_received  # type: pyqtSignal(MessageType, str)
         }  # {data_type: handler} for GUI update

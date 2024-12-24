@@ -466,8 +466,8 @@ class ChatCardView(HeaderCardWidget):
         self.scroll_value_temp = 0
         self.chatArea_pref_height = 0
     
-    def addMessage(self, name, message):
-        damaku = self.DamakuWidget(name, message, self)
+    def addMessage(self, name, message, timestamp):
+        damaku = self.DamakuWidget(name, message, timestamp=timestamp, parent=self)
         self.chatAreaLayout.addWidget(damaku)
         self.chatArea_pref_height += damaku.height() + 5
         self.chatWidget.setFixedHeight(self.chatArea_pref_height)
@@ -509,7 +509,7 @@ class ChatCardView(HeaderCardWidget):
         """
         trash_signal = pyqtSignal()
 
-        def __init__(self, name, message, parent=None):
+        def __init__(self, name, message, timestamp="hh:mm:ss", parent=None):
             super().__init__()
             self.setFixedWidth(260)
 
@@ -547,6 +547,16 @@ class ChatCardView(HeaderCardWidget):
             self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
             self.adjustSize()
 
+            self.defaultText = f"<span style='color: #707070; font-weight: 500;'>{name}</span>&nbsp;&nbsp; <span>{self.convert_plain_text(message)}</span>"
+            self.timestamp = f"&nbsp;&nbsp; <span style='color:#a6a6a6; font-weight: 350;'>{timestamp}</span>"
+
+        def enterEvent(self, e):
+            """show hiden timestamp"""
+            self.textDisplay.setText(self.defaultText + self.timestamp)
+
+        def leaveEvent(self, e):
+            """hide timestamp"""
+            self.textDisplay.setText(self.defaultText)
 
         @staticmethod
         def convert_plain_text(text):

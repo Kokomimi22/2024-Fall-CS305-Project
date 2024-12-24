@@ -82,7 +82,7 @@ class AppConfig:
 class AppController(QObject):
 
     closed = pyqtSignal()
-    message_received = pyqtSignal(str, str)  # sender_name, message
+    message_received = pyqtSignal(str, str, str)  # sender_name, message, timestamp
     video_received = pyqtSignal(Image)  # video
     control_received = pyqtSignal(MessageType, str)  # for control message
 
@@ -142,6 +142,11 @@ class AppController(QObject):
         if to == 'main':
             self.mainui.show()
             self.loginui.hide()
+            try:
+                self.homecontrol.meetingCardGroup.flush_meeting_cards()
+                print("[INFO] Meeting cards flushed")
+            except Exception as e:
+                print("[ERROR] failed to flush meeting cards due to ", e)
         elif to == 'login':
             self.mainui.hide()
             self.loginui.show()
@@ -336,6 +341,18 @@ class TestController:
         self.video_preview = VideoPreview(self.interface.previewarea)
         self.audio_preview = AudioPreview(self.interface.soundpreviewarea)
 
+## Exception handling
+def excepthook(exc_type, exc_value, exc_tb):
+    message = f"An exception of type {exc_type.__name__} occurred.\n" \
+                f"Exception message: {str(exc_value)}\n" \
+                f"Traceback: {exc_tb}"
+    print(message)
+    try:
+        conf_client.quit_conference()
+    except Exception as e:
+        print(f"Error disconnecting from server: {e}")
+    sys.__excepthook__(exc_type, exc_value, exc_tb)
+
 from PyQt5.QtCore import Qt, QLocale
 from PyQt5.QtWidgets import QApplication
 from qfluentwidgets import FluentTranslator
@@ -347,6 +364,7 @@ if __name__ == '__main__':
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
 
+    sys.excepthook = excepthook
     app = QApplication(sys.argv)
 
     # Internationalization
