@@ -153,11 +153,14 @@ def capture_camera() -> Tuple[bool, np.array]:
     return ret, frame
 
 
+# Get information of the monitor
+with mss.mss() as sct:
+    monitor = sct.monitors[1]
+
 def capture_screen():
     try:
         with mss.mss() as sct:
-            # Get information of the monitor
-            monitor = sct.monitors[1]
+
             screenshot = sct.grab(monitor)
 
             # Convert the screenshot to a numpy array
