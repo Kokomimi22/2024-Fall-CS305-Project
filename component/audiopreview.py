@@ -1,7 +1,7 @@
 # controller for audio preview card widget
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtProperty, pyqtSlot, QIODevice
-from PyQt5.QtMultimedia import QAudioOutput
+from PyQt5.QtMultimedia import QAudioOutput, QAudioInput
 from qfluentwidgets import FluentIcon
 
 from util import *

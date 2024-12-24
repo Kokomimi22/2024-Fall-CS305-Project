@@ -4,6 +4,7 @@ from math import ceil
 
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtGui import QImage
+from PyQt5.QtMultimedia import QCamera, QCameraImageCapture
 from qfluentwidgets import FluentIcon
 
 from util import *

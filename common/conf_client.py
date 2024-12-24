@@ -22,8 +22,7 @@ class ConferenceClient:
         self.is_working = True
         self.conf_server_addr = None  # conference server addr
         self.data_server_addr: Dict[str, Any] = None  # data server in the conference server
-        self.on_meeting = False  # status
-        self.isManager = False  # whether the client is the manager of the conference
+        self.on_meeting = False  # status of the client
         self.conns: Dict[str, socket.socket] = {}  # connections for different data types and **p2p**
         self.support_data_types = \
             ['video', 'audio', 'text']  # the data types that can be shared, which should be modified
@@ -60,7 +59,6 @@ class ConferenceClient:
             response = json.loads(recv_data)
             if response['status'] == Status.SUCCESS.value:
                 print(response['conferences'])
-                print(response)
             else:
                 print(f"[Error]: {response['message']}")
             return response
@@ -85,7 +83,6 @@ class ConferenceClient:
             if recv_data['status'] == Status.SUCCESS.value:
                 # 成功了就加入会议
                 self.join_conference(recv_data['conference_id'])
-                self.isManager = True
                 print(f'[Info]: Created conference {self.conference_id} successfully')
             else:
                 print(f'[Error]: {recv_data["message"]}')
@@ -126,9 +123,6 @@ class ConferenceClient:
         """
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
-            return f'[Error]: You are not in a conference'
-        if self.isManager:
-            return self.cancel_conference()
         quit_request = {
             'type': MessageType.QUIT.value,
             'client_id': self.userInfo.uuid,
@@ -142,9 +136,6 @@ class ConferenceClient:
         if not self.on_meeting:
             print(f'[Error]: You are not in a conference')
             return f'[Error]: You are not in a conference'
-        if not self.isManager:
-            print(f'[Error]: You are not the manager of this conference')
-            return f'[Error]: You are not the manager of this conference'
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_IP, MAIN_SERVER_PORT))
             cancel_request = {
@@ -155,7 +146,6 @@ class ConferenceClient:
             s.sendall(json.dumps(cancel_request).encode())
             recv_data = json.loads(s.recv(CONTROL_LINE_BUFFER).decode('utf-8'))
             if recv_data['status'] == Status.SUCCESS.value:
-                self.isManager = False
                 self.on_meeting = False
             else:
                 print(f'[Error]: {recv_data["message"]}')
@@ -183,6 +173,7 @@ class ConferenceClient:
                 _recv_data = self.conns['text'].recv(DATA_LINE_BUFFER)
             except ConnectionResetError:
                 print(f'[Info]: Server disconnected')
+                self.close_conference()
                 break
             # 检查是否退出会议
             if not _recv_data or _recv_data == b'Quitted' or _recv_data == b'Cancelled':
@@ -284,7 +275,7 @@ class ConferenceClient:
                     break
                 except ConnectionRefusedError:
                     print(f'[Info]: Waiting for the peer to connect')
-                    time.sleep(1)
+                    time.sleep(0.5)
             self.recv_thread['p2p_text'] = threading.Thread(target=self.recv_p2p_task)
             self.recv_thread['p2p_text'].start()
         elif 'p2p_text' in self.recv_thread:
@@ -389,7 +380,6 @@ class ConferenceClient:
                         instance.terminate()
                         setattr(self, attr, None)
                 self.is_p2p = False
-                self.isManager = False
                 # Join send and receive threads if they are not the current thread
                 for thread_dict in [self.send_thread, self.recv_thread]:
                     for thread in thread_dict.values():

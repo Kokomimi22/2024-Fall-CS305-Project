@@ -20,6 +20,11 @@ class MainServer:
         """
         get all conferences and infos
         """
+        # 删除已经关闭的会议服务器
+        to_delete = [conference_id for conference_id, conference_server in self.conference_servers.items() if
+                     not conference_server.running]
+        for conference_id in to_delete:
+            del self.conference_servers[conference_id]
         return {
             'status': Status.SUCCESS.value,
             'conferences': list(self.conference_servers.keys()),

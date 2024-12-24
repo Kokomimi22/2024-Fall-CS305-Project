@@ -22,7 +22,7 @@ class ClientCLI:
                 if not continue_flag:
                     break
         except Exception as e:
-            traceback.print_exc()
+            #traceback.print_exc()
             print(f'[Error]: {e}')
         finally:
             if self.client.userInfo:

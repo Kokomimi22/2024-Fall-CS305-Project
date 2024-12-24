@@ -1,6 +1,7 @@
 import atexit
 import json
 import sys
+import traceback
 
 from PIL.Image import Image
 from PyQt5.QtCore import pyqtSignal, QObject
@@ -99,11 +100,6 @@ class AppController(QObject):
         self.mainui.close_signal.connect(self.closed)
         self.closed.connect(self.close)
 
-        # initial other controller
-
-
-        # connect signal
-
     def send_text_message(self, message):
         conf_client.send_message(message)
 
@@ -146,11 +142,10 @@ class AppController(QObject):
             self.mainui.hide()
             self.loginui.show()
         else:
-            pass
+            print('Invalid UI name')
 
     def start(self):
         self.logincontol.register_all_action()
-        pass
 
     def close(self):
         self.mainui.close()
@@ -166,7 +161,6 @@ class AppController(QObject):
         self.send_video_stop()
 
         try:
-            conf_client.quit_conference() # 退出会议
             conf_client.logout()  # 断开与服务器的连接
         except Exception as e:
             print(f"Error disconnecting from server: {e}")
@@ -205,7 +199,7 @@ class LoginController:
             self.switch_to_main()
             self.app.mainui.setNavigationName(username)
         else:
-            self.loginui.info('error', 'Error', 'Failed to login')
+            self.loginui.info('error', 'Error', server_response['message'])
 
     def register(self):
         username = self.loginui.lineEdit_3.text()
@@ -225,9 +219,9 @@ class LoginController:
                 self.remember()
                 self.switch_to_main()
             else:
-                self.loginui.info('error', 'Error', 'Failed to login. Please login again')
+                self.loginui.info('error', 'Error', login_res['message'])
         else:
-            self.loginui.info('error', 'Error', 'Failed to register')
+            self.loginui.info('error', 'Error', register_res['message'])
 
     def setRemember(self, state):
         self.isremember = state == 2
@@ -280,8 +274,7 @@ class HomeController:
                 self.app.mainui.hide()
                 self.meetingInterface.show()
             else:
-                self.interface.info('error', 'Error', 'Failed to create meeting')
-                pass
+                self.interface.info('error', 'Error', response['message'])
 
         except Exception as e:
             print(e)
@@ -308,7 +301,7 @@ class HomeController:
                 self.app.mainui.hide()
                 self.meetingInterface.show()
             else:
-                self.interface.info('error', 'Error', 'Failed to join meeting')
+                self.interface.info('error', 'Error', response['message'])
         except Exception as e:
             print(e)
             self.interface.info('error', 'Error', 'Failed to join meeting')
@@ -326,7 +319,6 @@ class HomeController:
             conf_client.quit_conference()
         except Exception as e:
             print(e)
-            return
 
 class TestController:
 
@@ -337,10 +329,29 @@ class TestController:
         self.audio_preview = AudioPreview(self.interface.soundpreviewarea)
 
 from PyQt5.QtCore import Qt, QLocale
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QMessageBox
 from qfluentwidgets import FluentTranslator
 
+def handle_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    error_message = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+    print(error_message)  # 打印到控制台
+
+    # 显示错误消息框
+    msg_box = QMessageBox()
+    msg_box.setIcon(QMessageBox.Critical)
+    msg_box.setText("An unexpected error occurred")
+    msg_box.setInformativeText(str(exc_value))
+    msg_box.setDetailedText(error_message)
+    msg_box.setWindowTitle("Error")
+    msg_box.exec_()
+
+
 if __name__ == '__main__':
+    sys.excepthook = handle_exception
     # enable dpi scale
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
