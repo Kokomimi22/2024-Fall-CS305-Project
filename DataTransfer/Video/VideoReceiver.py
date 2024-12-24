@@ -69,7 +69,7 @@ class VideoReceiver:
                     break
             except BlockingIOError:
                 self._check_timeouts()
-                time.sleep(0.005)
+                time.sleep(1e-3)
                 continue
             except OSError:
                 break
@@ -146,7 +146,7 @@ class VideoReceiver:
                 grid_image_pil = Image.fromarray(grid_image)
                 self.update_signal.emit(grid_image_pil)
             else:
-                self.update_signal.emit(Image.new('RGB', (640, 480)))
+                self.update_signal.emit(Image.new('RGB', (camera_width, camera_height)))
                 print("No camera images to display")
         else:
             if not self.frames:
