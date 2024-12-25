@@ -74,38 +74,6 @@ def resize_image_to_fit_screen(image, my_screen_size):
 
     return resized_image
 
-
-# def overlay_camera_images(camera_images: List[np.array], grid_size=(2, 2), fixed_size=(1700, 960), spacing=5):
-#     """
-#     Overlay multiple camera images into a grid with fixed size and spacing between images.
-#
-#     :param camera_images: list of np.array, list of camera images
-#     :param grid_size: tuple, grid size (rows, columns)
-#     :param fixed_size: tuple, fixed size (width, height) of the output image
-#     :param spacing: int, spacing between images in pixels
-#     :return: np.array, combined image in numpy array format
-#     """
-#     if not camera_images:
-#         raise ValueError("No camera images to overlay")
-#
-#     # Determine the size of each cell in the grid, accounting for spacing
-#     cell_width = (fixed_size[0] - (grid_size[1] - 1) * spacing) // grid_size[1]
-#     cell_height = (fixed_size[1] - (grid_size[0] - 1) * spacing) // grid_size[0]
-#
-#     # Create a blank image for the grid
-#     grid_image = np.zeros((fixed_size[1], fixed_size[0], 3), dtype=np.uint8)
-#
-#     # Resize and paste each camera image into the grid with spacing
-#     for idx, camera_image in enumerate(camera_images):
-#         row = idx // grid_size[1]
-#         col = idx % grid_size[1]
-#         y = row * (cell_height + spacing)
-#         x = col * (cell_width + spacing)
-#         resized_image = cv2.resize(camera_image, (cell_width, cell_height))
-#         grid_image[y:y + cell_height, x:x + cell_width] = resized_image
-#
-#     return grid_image
-
 def overlay_camera_images(camera_images: List[np.array], grid_size=(2, 2)):
     """
     Overlay multiple camera images into a grid.
@@ -144,7 +112,11 @@ def qcapture_screen():
 
 def capture_camera() -> Tuple[bool, np.array]:
     # capture frame of camera
-    ret, frame = cap.read()
+    try:
+        ret, frame = cap.read()
+    except Exception as e:
+        print(f"Failed to capture camera: {e}")
+        return False, None
     if not ret:
         print('Fail to capture frame from camera')
         return False, None
