@@ -242,7 +242,7 @@ class FullCommandBar(CommandBar):
         self.share_action = TransparentDropDownPushButton(FluentIcon.SHARE, 'Share')
         self.share_action.setFixedSize(100, 30)
         self.share_action.setFont(QFont('Segoe UI', 9))
-        self.speak_action = Action(MeetingIcon.STOP_SPEAK, 'Speak')
+        self.speak_action = Action(FluentIcon.MICROPHONE, 'Speak')
 
         self.addWidget(self.share_action)
         self.addActions([
@@ -282,7 +282,7 @@ class FullCommandBar(CommandBar):
         action1.setChecked(True)
 
     def setSpeak(self, isSpeaking):
-        self.speak_action.setIcon(MeetingIcon.STOP_SPEAK if isSpeaking else FluentIcon.MICROPHONE)
+        self.speak_action.setIcon(FluentIcon.MICROPHONE if isSpeaking else MeetingIcon.STOP_SPEAK)
 
     def share_menu_event(self, checked):
         if checked:

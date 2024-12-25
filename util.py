@@ -256,14 +256,15 @@ def audio_data_to_volume(data):
     :return: int, volume [0, 100]
     """
     # convert bytes to numpy array
-    if not data:
-        return 0
     data = np.frombuffer(data, dtype=np.int16)
     # calculate volume
-    volume = np.sqrt(np.mean(data ** 2))
-    volume = volume if volume < 100 else 100.0
-    int16_max_value = np.iinfo(np.int16).max
-    return int(volume)
+    try:
+        volume = np.sqrt(np.mean(data ** 2))
+        volume = volume if volume < 100 else 100.0
+        int16_max_value = np.iinfo(np.int16).max
+        return int(volume)
+    except Exception as e:
+        return 0
 
 
 def get_localhost_ip():
