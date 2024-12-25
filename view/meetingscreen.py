@@ -242,7 +242,7 @@ class FullCommandBar(CommandBar):
         self.share_action = TransparentDropDownPushButton(FluentIcon.SHARE, 'Share')
         self.share_action.setFixedSize(100, 30)
         self.share_action.setFont(QFont('Segoe UI', 9))
-        self.speak_action = Action(FluentIcon.MICROPHONE, 'Speak')
+        self.speak_action = Action(MeetingIcon.STOP_SPEAK, 'Speak')
 
         self.addWidget(self.share_action)
         self.addActions([
